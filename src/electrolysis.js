@@ -168,13 +168,4 @@ function electrolysisLimit(W, TC, S, DIC, startPH, endPH) {
   return OH / Avogadro / hydroxideRequirement(TC, S, DIC, startPH, endPH);
 }
 
-// Calculate the theoretical potential needed for seawater electrolysis.
-// > print(electrolysisPotential(29.5, 35.4, 7.76));
-// -1.8304110483470388
-
-// Calculate the number of moles of hydroxide ions needed to alkalize one liter.
-// > print(hydroxideRequirement(29.5, 35.4, 0.002229376 / density(29.5, 35.4),
-//                              7.76, 8.2));
-// 0.00026682691299919205
-
-module.exports = { electrolysisLimit };
+module.exports = { electrolysisLimit, electrolysisPotential, hydroxideRequirement };

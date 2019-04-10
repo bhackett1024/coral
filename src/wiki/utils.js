@@ -11,6 +11,8 @@ function expect(actual, expected) {
   }
 }
 
+// Get some constants for environmental conditions to consider while modeling.
+
 // Get the average values of temperature, salinity, DIC, and pH for the grid
 // coordinate (66,130) closest to Opunohu Bay on Moorea in 2006-2010 and 2096-2100.
 //
@@ -30,10 +32,14 @@ const Salinity_2010 = 35.4, Salinity_2100 = 35.4;
 const DIC_2010 = 0.002037928 / density(27.6, 35.4), DIC_2100 = 0.002229376 / density(29.5, 35.4);
 const pH_2010 = 8.08, pH_2100 = 7.76;
 
+// Target pH we want to alkalize water to.
+const pH_Target = 8.2;
+
 module.exports = {
   expect,
   Temp_2010, Temp_2100,
   Salinity_2010, Salinity_2100,
   DIC_2010, DIC_2100,
-  pH_2010, pH_2100
+  pH_2010, pH_2100,
+  pH_Target
 };
