@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+const { carbonateConcentrations, density } = require("./carbonate");
+
 function assert(v) {
   if (!v) {
     throw new Error("Assertion failed!");
@@ -166,37 +168,6 @@ function electrolysisLimit(W, TC, S, DIC, startPH, endPH) {
   return OH / Avogadro / hydroxideRequirement(TC, S, DIC, startPH, endPH);
 }
 
-// Determine the amount of water that can be alkalized by a 100W solar panel in
-// conditions expected for the end of the century. Use the average values of
-// temperature, salinity, DIC, and pH for the grid coordinate (66,130) closest
-// to Opunohu Bay in 2096-2100.
-//
-// Data source:
-//
-// Dunne, John; John, Jasmin; Shevliakova, Elena; Stouffer, Ronald; Griffies, Stephen; Malyshev, Sergey; Milly, P.; Sentman, Lori; Adcroft, Alistair; Cooke, William; Dunne, Krista; Hallberg, Robert; Harrison, Matthew; Krasting, John; Levy, Hiram; Phillips, Peter; Samuels, Bonita; Spelman, Michael; Winton, Michael; Wittenberg, Andrew; Zadeh, Niki
-// NOAA GFDL GFDL-ESM2M, rcp85 experiment output for CMIP5 AR5, served by ESGF
-//
-// Tracking IDs:
-//
-// Temperature: 9cfab26d-0591-4c50-83fc-76f4501d4771
-// Salinity: d8ccebdd-c8dd-46ed-a876-382a7ec16c61
-// DIC: 2307f360-a117-4a6a-8541-c6099b5f5976
-// pH: 9c5ddc62-cdc4-42d8-bfea-5c7800031bc1
-//
-// Looking at the contributions of the various ions in hydroxideRequirement()
-// gives a good sense of the buffering that happens in seawater and makes it
-// resistant to changes in pH. Of the hydroxide ions required to change the
-// pH to 8.2:
-//
-// 0.004% (1 in 24107) neutralizes an H+ ion.
-// 0.37% (1 in 264) is needed to maintain the equilibrium between [H+] and [OH-].
-// 91.3% is needed to neutralize H+ ions added as CO2 and HCO3- disassociate.
-// 8.3% is needed to bring boric acid species into equilibrium.
-//
-// > print(electrolysisLimit(100, 29.5, 35.4, 0.002229376 / density(29.5, 35.4),
-//                           7.76, 8.2));
-// 2.1220809101172438
-
 // Calculate the theoretical potential needed for seawater electrolysis.
 // > print(electrolysisPotential(29.5, 35.4, 7.76));
 // -1.8304110483470388
@@ -205,3 +176,5 @@ function electrolysisLimit(W, TC, S, DIC, startPH, endPH) {
 // > print(hydroxideRequirement(29.5, 35.4, 0.002229376 / density(29.5, 35.4),
 //                              7.76, 8.2));
 // 0.00026682691299919205
+
+module.exports = { electrolysisLimit };
