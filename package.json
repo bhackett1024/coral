@@ -1,0 +1,12 @@
+{
+  "name": "coral",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": true,
+  "files": [
+    "srcasdfsfd"
+  ],
+  "scripts": {
+    "wiki": "node src/wiki.js"
+  }
+}
