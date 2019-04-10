@@ -130,4 +130,4 @@ function associationK2(TC, S) {
   return Math.pow(10, -pK2);
 }
 
-module.exports = { generateBjerrumData, carbonateConcentrations, density };
+module.exports = { generateBjerrumData, carbonateConcentrations, density, densityH2O };

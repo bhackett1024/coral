@@ -57,4 +57,4 @@ function design3(anodeRate, halfLife, primaryVolume, outflow, secondaryVolume) {
   return fraction * design2(anodeRate, halfLife, primaryVolume, outflow);
 }
 
-module.exports = { design1, design2, design3 };
+module.exports = { design1, design2, design3, steadyStateChlorine };

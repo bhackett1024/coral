@@ -42,6 +42,9 @@ const Chlorine_PNEC = 4.2e-8;
 
 // Parameters for evaluating an electrolysis cell:
 
+// How much current flows through the cell.
+const Cell_Amps = 16.7;
+
 // How much chlorine is produced at the anode (g/s).
 const Cell_ChlorineRate = 6.1e-3;
 
@@ -57,6 +60,13 @@ const Cell_SecondaryCompartment = 9000;
 // and 12.5 hours in the secondary compartment.
 const Cell_Outflow = 0.2;
 
+// Size of the interface between the anode and cathode compartments, across
+// which species can move (cm^2).
+const Cell_InterfaceSize = 16;
+
+// Speed of the current passing along the interface between compartments (cm/s).
+const Cell_InterfaceCurrent = 25;
+
 module.exports = {
   expect,
   Temp_2010, Temp_2100,
@@ -65,5 +75,7 @@ module.exports = {
   pH_2010, pH_2100,
   pH_Target,
   Chlorine_HalfLife, Chlorine_PNEC,
-  Cell_ChlorineRate, Cell_PrimaryCompartment, Cell_SecondaryCompartment, Cell_Outflow
+  Cell_Amps, Cell_ChlorineRate,
+  Cell_PrimaryCompartment, Cell_SecondaryCompartment, Cell_Outflow,
+  Cell_InterfaceSize, Cell_InterfaceCurrent
 };

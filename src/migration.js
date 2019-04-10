@@ -1,5 +1,9 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
+const { C, Avogadro, hydroxideRequirement } = require("./electrolysis");
+const { steadyStateChlorine } = require("./chlorine");
+
 function solveForParameter(start, end, fn) {
   for (var i = 0; i < 30; i++) {
     const middle = (start + end) / 2;
@@ -456,16 +460,4 @@ function electrolysisIonMovement({ TC, S, DIC,
   return { anodePH, migrationLoss, diffusionLoss, chlorineDilution };
 }
 
-// Compute parameters for the example cell.
-// const rv = electrolysisIonMovement({
-//   TC: 29.5, S: 35.4, DIC: 0.002229376 / density(29.5, 35.4),
-//   amps: 16.7, halfLife: 7200, volume: 27000, outflow: 0.2, interface: 16, current: 25,
-//   startPH: 7.76, endPH: 8.2
-// });
-// > print(JSON.stringify(rv));
-// {"anodePH":6.110942176990212,
-//  "migrationLoss":0.0016479736898815092,
-//  "diffusionLoss":0.0025427328825940025,
-//  "chlorineDilution":94.47230599266902}
-// > print(rv.migrationLoss + rv.diffusionLoss);
-// 0.004190706572475512
+module.exports = { electrolysisIonMovement };

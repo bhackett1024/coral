@@ -168,4 +168,4 @@ function electrolysisLimit(W, TC, S, DIC, startPH, endPH) {
   return OH / Avogadro / hydroxideRequirement(TC, S, DIC, startPH, endPH);
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, hydroxideRequirement };
+module.exports = { electrolysisLimit, electrolysisPotential, hydroxideRequirement, C, Avogadro };
