@@ -11,9 +11,8 @@ function expect(actual, expected) {
   }
 }
 
-// Get some constants for environmental conditions to consider while modeling.
-
-// Get the average values of temperature, salinity, DIC, and pH for the grid
+// Get some constants for environmental conditions to consider while modeling:
+// the average values of temperature, salinity, DIC, and pH for the grid
 // coordinate (66,130) closest to Opunohu Bay on Moorea in 2006-2010 and 2096-2100.
 //
 // Data source:
@@ -35,11 +34,36 @@ const pH_2010 = 8.08, pH_2100 = 7.76;
 // Target pH we want to alkalize water to.
 const pH_Target = 8.2;
 
+// Assumed half life for chlorine compounds (s).
+const Chlorine_HalfLife = 7200;
+
+// Predicted No Effect Concentration (PNEC) of chlorine (g/l).
+const Chlorine_PNEC = 4.2e-8;
+
+// Parameters for evaluating an electrolysis cell:
+
+// How much chlorine is produced at the anode (g/s).
+const Cell_ChlorineRate = 6.1e-3;
+
+// Primary anode compartment size is 3m x 3m x 3m = 27000 l
+const Cell_PrimaryCompartment = 27000;
+
+// Secondary anode compartment size is 3m x 3m x 1m = 9000 l
+const Cell_SecondaryCompartment = 9000;
+
+// Rate of water flow in/out of anode compartment (l/s).
+//
+// This gives residence times of 37.5 hours in the primary compartment
+// and 12.5 hours in the secondary compartment.
+const Cell_Outflow = 0.2;
+
 module.exports = {
   expect,
   Temp_2010, Temp_2100,
   Salinity_2010, Salinity_2100,
   DIC_2010, DIC_2100,
   pH_2010, pH_2100,
-  pH_Target
+  pH_Target,
+  Chlorine_HalfLife, Chlorine_PNEC,
+  Cell_ChlorineRate, Cell_PrimaryCompartment, Cell_SecondaryCompartment, Cell_Outflow
 };
