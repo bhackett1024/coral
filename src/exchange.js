@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+const { carbonateConcentrations } = require("./carbonate");
+
 // Return how much OH- is needed to neutralize any acid introduced due to flux
 // of CO2 from the atmosphere into the water after raising the water pH from
 // startPH to endPH. Result is in mol m^-2 h^-1.
@@ -58,6 +60,4 @@ function neutralizeRequirement(TC, S, DIC, startPH, endPH, windSpeed) {
   return CO2flux * (endCarbonate.HCO3 / DIC + endCarbonate.CO3 * 2 / DIC);
 }
 
-// > print(neutralizeRequirement(29.5, 35.4, 0.002229376 / density(29.5, 35.4),
-//                               7.76, 8.2, 6));
-// 0.0016256400654713569
+module.exports = { neutralizeRequirement };
