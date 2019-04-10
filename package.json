@@ -7,6 +7,6 @@
     "srcasdfsfd"
   ],
   "scripts": {
-    "wiki": "node src/wiki.js"
+    "wiki": "./src/wiki/wiki"
   }
 }

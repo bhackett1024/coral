@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for filename in $(dirname $0)/*.js
+do
+  node $filename
+done
