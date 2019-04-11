@@ -1,6 +1,21 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
-const { density } = require("../carbonate");
+const { Terms } = require("../units");
+
+const {
+  Celsius,
+  Salinity,
+  Molarity,
+  pH,
+  Seconds,
+  Liters,
+  GramsPerLiter,
+  GramsPerSecond,
+  LitersPerSecond,
+  Amperes,
+  SquareCentimeters,
+  CentimetersPerSecond
+} = Terms;
 
 // Make sure that a computed value matches what the data in the wiki.
 function expect(actual, expected) {
@@ -26,46 +41,46 @@ function expect(actual, expected) {
 // Salinity: 1d57bf2b-d5f7-4539-9b77-d6878ad161be, d8ccebdd-c8dd-46ed-a876-382a7ec16c61
 // DIC: 2f917c29-567b-495d-812a-a70d8b758484, 2307f360-a117-4a6a-8541-c6099b5f5976
 // pH: 1b93c61d-3a60-44a8-9677-902a1bb53944, 9c5ddc62-cdc4-42d8-bfea-5c7800031bc1
-const Temp_2010 = 27.6, Temp_2100 = 29.5;
-const Salinity_2010 = 35.4, Salinity_2100 = 35.4;
-const DIC_2010 = 0.002037928 / density(27.6, 35.4), DIC_2100 = 0.002229376 / density(29.5, 35.4);
-const pH_2010 = 8.08, pH_2100 = 7.76;
+const Temp_2010 = Celsius(27.6), Temp_2100 = Celsius(29.5);
+const Salinity_2010 = Salinity(35.4), Salinity_2100 = Salinity(35.4);
+const DIC_2010 = Molarity(0.002037928), DIC_2100 = Molarity(0.002229376);
+const pH_2010 = pH(8.08), pH_2100 = pH(7.76);
 
 // Target pH we want to alkalize water to.
-const pH_Target = 8.2;
+const pH_Target = pH(8.2);
 
-// Assumed half life for chlorine compounds (s).
-const Chlorine_HalfLife = 7200;
+// Assumed half life for chlorine compounds.
+const Chlorine_HalfLife = Seconds(7200);
 
-// Predicted No Effect Concentration (PNEC) of chlorine (g/l).
-const Chlorine_PNEC = 4.2e-8;
+// Predicted No Effect Concentration (PNEC) of chlorine.
+const Chlorine_PNEC = GramsPerLiter(4.2e-8);
 
 // Parameters for evaluating an electrolysis cell:
 
 // How much current flows through the cell.
-const Cell_Amps = 16.7;
+const Cell_Amps = Amperes(16.7);
 
 // How much chlorine is produced at the anode (g/s).
-const Cell_ChlorineRate = 6.1e-3;
+const Cell_ChlorineRate = GramsPerSecond(6.1e-3);
 
 // Primary anode compartment size is 3m x 3m x 3m = 27000 l
-const Cell_PrimaryCompartment = 27000;
+const Cell_PrimaryCompartment = Liters(27000);
 
 // Secondary anode compartment size is 3m x 3m x 1m = 9000 l
-const Cell_SecondaryCompartment = 9000;
+const Cell_SecondaryCompartment = Liters(9000);
 
 // Rate of water flow in/out of anode compartment (l/s).
 //
 // This gives residence times of 37.5 hours in the primary compartment
 // and 12.5 hours in the secondary compartment.
-const Cell_Outflow = 0.2;
+const Cell_Outflow = LitersPerSecond(0.2);
 
 // Size of the interface between the anode and cathode compartments, across
 // which species can move (cm^2).
-const Cell_InterfaceSize = 16;
+const Cell_InterfaceSize = SquareCentimeters(16);
 
 // Speed of the current passing along the interface between compartments (cm/s).
-const Cell_InterfaceCurrent = 25;
+const Cell_InterfaceCurrent = CentimetersPerSecond(25);
 
 module.exports = {
   expect,

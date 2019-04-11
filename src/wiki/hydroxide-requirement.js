@@ -1,6 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
 const { hydroxideRequirement } = require("../electrolysis");
+const { Units } = require("../units");
 const {
   expect,
   Temp_2100, Salinity_2100, DIC_2100, pH_2100,
@@ -20,5 +21,6 @@ const {
 // 0.37% (1 in 264) is needed to maintain the equilibrium between [H+] and [OH-].
 // 91.3% is needed to neutralize H+ ions added as CO2 and HCO3- disassociate.
 // 8.3% is needed to bring boric acid species into equilibrium.
-expect(hydroxideRequirement(Temp_2100, Salinity_2100, DIC_2100, pH_2100, pH_Target),
-       0.00026682691299919205);
+expect(hydroxideRequirement(Temp_2100, Salinity_2100, DIC_2100, pH_2100,
+                            pH_Target).normalize(Units.Molarity),
+       0.00026402401575146737);

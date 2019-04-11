@@ -1,13 +1,16 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
 const { carbonateConcentrations } = require("./carbonate");
+const { Units, Terms } = require("./units");
 
 // Return how much OH- is needed to neutralize any acid introduced due to flux
 // of CO2 from the atmosphere into the water after raising the water pH from
-// startPH to endPH. Result is in mol m^-2 h^-1.
-function neutralizeRequirement(TC, S, DIC, startPH, endPH, windSpeed) {
-  const startCarbonate = carbonateConcentrations(TC, S, DIC, startPH);
-  const endCarbonate = carbonateConcentrations(TC, S, DIC, endPH);
+// startPH to endPH.
+function neutralizeRequirement(T, S, DIC, startPH, endPH, windSpeed) {
+  windSpeed = windSpeed.normalize(Units.MetersPerSecond);
+
+  const startCarbonate = carbonateConcentrations(T, S, DIC, startPH);
+  const endCarbonate = carbonateConcentrations(T, S, DIC, endPH);
 
   // Atmospheric flux depends on the CO2 concentration in the atmosphere and its
   // solubility in water, which can be derived to find an imbalance in CO2
@@ -16,7 +19,9 @@ function neutralizeRequirement(TC, S, DIC, startPH, endPH, windSpeed) {
   // We can simplify this by assuming that the atmosphere is in equilibrium with
   // the amount of CO2 in the water at startPH. The CO2 imbalance is then the
   // difference in CO2 concentrations between the two different values of pH.
-  const imbalance = (startCarbonate.CO2 - endCarbonate.CO2) / 1000; // mol cm^-3
+  const imbalance =
+    (startCarbonate.CO2.normalize(Units.Molarity) -
+     endCarbonate.CO2.normalize(Units.Molarity)) / 1000; // mol cm^-3
 
   // The rate at which atmospheric CO2 will enter the water to correct this
   // imbalance depends on the sea state. The windier is, the more turbulent the
@@ -57,7 +62,10 @@ function neutralizeRequirement(TC, S, DIC, startPH, endPH, windSpeed) {
   // concentrations at the pH the water was raised to. In order to keep the pH
   // stable, we need OH to neutralize the H+ ion added when H2CO3 disassociates
   // to HCO3, and the two H+ ions added when H2CO3 fully disassociates to CO3.
-  return CO2flux * (endCarbonate.HCO3 / DIC + endCarbonate.CO3 * 2 / DIC);
+  const HCO3Fraction = endCarbonate.HCO3.normalize(Units.Molarity) / DIC.normalize(Units.Molarity);
+  const CO3Fraction = endCarbonate.CO3.normalize(Units.Molarity) / DIC.normalize(Units.Molarity);
+
+  return Terms.MolesPerSquareMeterHour(CO2flux * (HCO3Fraction + CO3Fraction * 2));
 }
 
 module.exports = { neutralizeRequirement };

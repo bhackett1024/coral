@@ -1,6 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
 const { design1, design2, design3 } = require("../chlorine");
+const { Units } = require("../units");
 const {
   expect,
   Chlorine_HalfLife, Chlorine_PNEC,
@@ -11,12 +12,12 @@ const {
 //
 // Compute the amounts of chlorine which escapes to the environment with each
 // cell design (g).
-const Chlorine1 = design1(Cell_ChlorineRate, Chlorine_HalfLife);
+const Chlorine1 = design1(Cell_ChlorineRate, Chlorine_HalfLife).normalize(Units.Grams);
 const Chlorine2 = design2(Cell_ChlorineRate, Chlorine_HalfLife,
-                          Cell_PrimaryCompartment, Cell_Outflow);
+                          Cell_PrimaryCompartment, Cell_Outflow).normalize(Units.Grams);
 const Chlorine3 = design3(Cell_ChlorineRate, Chlorine_HalfLife,
                           Cell_PrimaryCompartment, Cell_Outflow,
-                          Cell_SecondaryCompartment);
+                          Cell_SecondaryCompartment).normalize(Units.Grams);
 expect(Chlorine1, 63.363166195843284);
 expect(Chlorine2, 4.875398701107538);
 expect(Chlorine3, 0.06405789516709288);
@@ -37,4 +38,4 @@ expect(chlorineToBleach(Chlorine3), 2.541979966948131);
 
 // Compute the volume needed to dilute 0.064 g of chlorine to the PNEC concentration.
 // 23m * 23m * 3m = 1587 m^3
-expect(Chlorine3 / Chlorine_PNEC / 1000, 1525.1879801688783); // m^3
+expect(Chlorine3 / Chlorine_PNEC.normalize(Units.GramsPerLiter) / 1000, 1525.1879801688783); // m^3

@@ -1,21 +1,8 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+const { assert } = require("./utils");
+const { Units, Terms } = require("./units");
 const { carbonateConcentrations, density } = require("./carbonate");
-
-function assert(v) {
-  if (!v) {
-    throw new Error("Assertion failed!");
-  }
-}
-
-// Return the density of the H2O in seawater in kg-H2O/l.
-function densityH2O(TC, S) {
-  // Subtract the weight of the salts from the weight of a liter of saltwater
-  // to get the weight of H2O per liter. Using S = g/kg of sea water.
-  const D = density(TC, S); // kg/l
-  const S2 = S * D; // g/kg * kg/l => g/l
-  return D - S2 / 1000; // kg-H2O/l
-}
 
 // Universal gas constant.
 const R = 8.3145; // J/(K*mol)
@@ -30,13 +17,13 @@ const Avogadro = 6.022e23;
 const C = Avogadro / F;
 
 // Compute the disassociation constant for H2O <-> H+ + OH-
-function waterDisassociation(TC) {
+function waterDisassociation() {
   // FIXME approximating here with the value for 25C.
   return 1e-14;
 }
 
 // Compute the disassociation constant for B(OH)3 + H2O <-> H+ + B(OH)4-
-function boricAcidDisassociation(TC) {
+function boricAcidDisassociation() {
   // FIXMe approximating here with the value for 25C.
   // S. Zumdahl, S. Zumdahl, D. DeCoste
   // Chemistry, Tenth Edition (Cengage Learning, 2014), pp A24
@@ -45,8 +32,9 @@ function boricAcidDisassociation(TC) {
 
 // Compute the potential in volts required to generate hydrogen and chlorine
 // gas via electrolysis of seawater.
-function electrolysisPotential(TC, S, pH) {
-  const T = TC + 273.15;
+function electrolysisPotential(T, S, pH) {
+  T = T.normalize(Units.Kelvin);
+  S = S.normalize(Units.Salinity);
 
   // Seawater electrolysis is based on the following half-reactions, with
   // standard reduction potentials:
@@ -64,23 +52,24 @@ function electrolysisPotential(TC, S, pH) {
   // units: (J/C) = (J/C) - (J/(K*mol)) * K / (C/mol)
 
   // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
-  const Cl_molality = 0.566; // for S=35, mol/kg-H2O
-  const Cl = Cl_molality * densityH2O(TC, S); // mol/kg-H2O * kg-H2O/l = mol/l
+  const ClStandard = Terms.MolesPerSeawaterKg(0.566);
+
+  const Cl = ClStandard.normalize(Units.Molarity) * S / 35;
 
   // pH is -log([H+]). [OH-] can be calculated from this using the dissociation
   // constant for water, Kw.
-  const Kw = waterDisassociation(TC);
-  const H = Math.pow(10, -pH);
+  const Kw = waterDisassociation();
+  const H = pH.concentrationH().normalize(Units.Molarity);
   const OH = Kw / H;
 
   // Compute the actual potential using the Nernst equation.
   const Q = Math.pow(OH, 2) / Math.pow(Cl, 2);
-  return -2.19 - R * T / (2 * F) * Math.log(Q);
+  return Terms.Volts(-2.19 - R * T / (2 * F) * Math.log(Q));
 }
 
 // Compute the number of hydroxide ions (mol OH-) needed to raise the pH of a
 // liter of water from startPH to endPH.
-function hydroxideRequirement(TC, S, DIC, startPH, endPH) {
+function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // Compute the concentrations (mol/l) of different species at the initial and
   // final pH. For each of these species, determine the number of moles of OH-
   // ions needed to effect the change.
@@ -88,15 +77,15 @@ function hydroxideRequirement(TC, S, DIC, startPH, endPH) {
 
   // [H+] decreases as pH increases. Each removed H+ ion must have been
   // neutralized by an introduced OH- ion.
-  const startH = Math.pow(10, -startPH);
-  const endH = Math.pow(10, -endPH);
+  const startH = startPH.concentrationH().normalize(Units.Molarity);
+  const endH = endPH.concentrationH().normalize(Units.Molarity);
   assert(endH < startH);
   newOH += startH - endH;
 
   // [OH-] increases as pH increases. As H+ ions are removed, additional OH-
   // ions are needed so that [H+] and [OH-] are in equilibrium according to the
   // disassociation constant Kw of water.
-  const Kw = waterDisassociation(TC);
+  const Kw = waterDisassociation();
   const startOH = Kw / startH;
   const endOH = Kw / endH;
   assert(endOH > startOH);
@@ -106,15 +95,13 @@ function hydroxideRequirement(TC, S, DIC, startPH, endPH) {
   // H+ ions to the water which need to be neutralized by OH-. Compute the total
   // number of hydrogen atoms in the carbonate species before and after the pH
   // change.
-  const startCarbonate = carbonateConcentrations(TC, S, DIC, startPH);
-  const endCarbonate = carbonateConcentrations(TC, S, DIC, endPH);
+  const startCarbonate = carbonateConcentrations(T, S, DIC, startPH);
+  const endCarbonate = carbonateConcentrations(T, S, DIC, endPH);
 
-  // Computed concentrations are in mol/kg-sw, multiply by the density kg-sw/l
-  // to get concentrations in mol/l. Ignore CO3, which has no hydrogen.
-  const startCO2 = startCarbonate.CO2 * density(TC, S);
-  const endCO2 = endCarbonate.CO2 * density(TC, S);
-  const startHCO3 = startCarbonate.HCO3 * density(TC, S);
-  const endHCO3 = endCarbonate.HCO3 * density(TC, S);
+  const startCO2 = startCarbonate.CO2.normalize(Units.Molarity);
+  const endCO2 = endCarbonate.CO2.normalize(Units.Molarity);
+  const startHCO3 = startCarbonate.HCO3.normalize(Units.Molarity);
+  const endHCO3 = endCarbonate.HCO3.normalize(Units.Molarity);
 
   // CO2 is effectively H2CO3 (carbonic acid), which it must form before it can
   // disassociate to HCO3-. Carbonic acid is diprotic and two H+ ions are
@@ -127,12 +114,14 @@ function hydroxideRequirement(TC, S, DIC, startPH, endPH) {
 
   // Boric acid is also present in seawater, in low concentrations compared to
   // carbonate species.
-  const Kb = boricAcidDisassociation(TC);
+  const Kb = boricAcidDisassociation();
 
   // The total amount of boric acid species at S=35, in mol/kg-H2O
   // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
-  const totalBoricKg = 0.0001045 + 0.0003259;
-  const totalBoric = totalBoricKg * densityH2O(TC, S);
+  const totalBoricStandard = Terms.MolesPerSeawaterKg(0.0001045 + 0.0003259);
+
+  const totalBoric =
+    totalBoricStandard.normalize(Units.Molarity) * S.normalize(Units.Salinity) / 35;
 
   // As pH increases, [B(OH)4-] increases. Each such ion needs an OH- ion to
   // form from B(OH)3.
@@ -148,24 +137,26 @@ function hydroxideRequirement(TC, S, DIC, startPH, endPH) {
   assert(startBorate < endBorate);
   newOH += endBorate - startBorate;
 
-  return newOH;
+  return Terms.Molarity(newOH);
 }
 
 // Compute the theoretical limit for the amount of seawater that can have its pH
-// raised from startPH to endPH using electrolysis, using a power source of
-// W watts. Result is in liters per second.
-function electrolysisLimit(W, TC, S, DIC, startPH, endPH) {
+// raised from startPH to endPH using electrolysis, using a power source W.
+function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   // Compute the maximum amperage possible with W watts. In practice the voltage
   // required will be greater than that produced by electrolysisPotential().
   // The actual voltage depends on the environment and will need to be
   // determined experimentally.
-  const Amps = W / -electrolysisPotential(TC, S, startPH);
+  const potential = -electrolysisPotential(T, S, startPH).normalize(Units.Volts);
+  const Amps = W.normalize(Units.Watts) / potential;
 
   // Each amp will move one coulomb of electrons per second. Each electron will
   // reduce one H2O molecule to OH-.
   const OH = Amps * C;
 
-  return OH / Avogadro / hydroxideRequirement(TC, S, DIC, startPH, endPH);
+  const requirement = hydroxideRequirement(T, S, DIC, startPH, endPH).normalize(Units.Molarity);
+
+  return Terms.LitersPerSecond(OH / Avogadro / requirement);
 }
 
 module.exports = { electrolysisLimit, electrolysisPotential, hydroxideRequirement, C, Avogadro };

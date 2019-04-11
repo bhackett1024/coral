@@ -2,7 +2,8 @@
 
 const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
 const { C, Avogadro, hydroxideRequirement } = require("./electrolysis");
-const { steadyStateChlorine } = require("./chlorine");
+const { steadyStateAmount } = require("./chlorine");
+const { Units, Terms } = require("./units");
 
 function solveForParameter(start, end, fn) {
   for (var i = 0; i < 30; i++) {
@@ -270,7 +271,7 @@ const seawaterIons = {
 
 let seawaterConductivity = 0;
 for (const [name, molkg] of Object.entries(seawaterIons)) {
-  const molarity = molkg * densityH2O(25, 35); // mol/l
+  const molarity = Terms.MolesPerSeawaterKg(molkg).normalize(Units.Molarity);
   seawaterConductivity += ionConductivity(name, molarity);
 }
 // > print(seawaterConductivity);
@@ -278,16 +279,6 @@ for (const [name, molkg] of Object.entries(seawaterIons)) {
 //
 // Seawater is actually 5.3 S/m. The calculated value is 50% higher due to the
 // overapproximation made in ionConductivity().
-
-// Compute carbonate concentrations in mol/l
-function carbonateConcentrationsMolarity(TC, S, DIC, pH) {
-  const { CO2, HCO3, CO3 } = carbonateConcentrations(TC, S, DIC, pH);
-  return {
-    CO2: CO2 / density(TC, S),
-    HCO3: HCO3 / density(TC, S),
-    CO3: CO3 / density(TC, S)
-  };
-}
 
 // Calculate movement due to migration and diffusion of ions and other species
 // when an anode and cathode compartment are connected together.
@@ -301,9 +292,16 @@ function carbonateConcentrationsMolarity(TC, S, DIC, pH) {
 // current (cm/s): Speed of convection in both compartments along the interface.
 // startPH (pH): Environmental pH.
 // endPH (pH): pH which the cathode compartment is being raised to.
-function electrolysisIonMovement({ TC, S, DIC,
+function electrolysisIonMovement({ T, S, DIC,
                                    amps, halfLife, volume, outflow, interface, current,
                                    startPH, endPH }) {
+  amps = amps.normalize(Units.Amperes);
+  halfLife = halfLife.normalize(Units.Seconds);
+  volume = volume.normalize(Units.Liters);
+  outflow = outflow.normalize(Units.LitersPerSecond);
+  interface = interface.normalize(Units.SquareCentimeters);
+  current = current.normalize(Units.CentimetersPerSecond);
+
   // Here are the species that can have different concentrations in the two
   // compartments, and whose movements we need to account for:
   //
@@ -323,18 +321,20 @@ function electrolysisIonMovement({ TC, S, DIC,
   // between the compartments. If the anode produces O2 then this happens
   // immediately, while if the anode produces Cl2 then the H+ forms as the
   // Cl2 disassociates.
-  const anodePH = solveForParameter(1, startPH, (pH) => {
-    return hydroxideRequirement(TC, S, DIC, pH, startPH) * outflow - chargeRate;
+  const anodePH = solveForParameter(1, startPH.normalize(Units.pH), (pH) => {
+    const requirement =
+      hydroxideRequirement(T, S, DIC, Terms.pH(pH), startPH).normalize(Units.Molarity);
+    return requirement * outflow - chargeRate;
   });
 
   // Concentrations in the cathode compartment.
-  const cathode = carbonateConcentrationsMolarity(TC, S, DIC, endPH);
-  const cathodeH = Math.pow(10, -endPH);
+  const cathode = carbonateConcentrations(T, S, DIC, endPH);
+  const cathodeH = endPH.concentrationH().normalize(Units.Molarity);
   const cathodeOH = 1e-14 / cathodeH;
 
   // Concentrations in the anode compartment.
-  const anode = carbonateConcentrationsMolarity(TC, S, DIC, anodePH);
-  const anodeH = Math.pow(10, -anodePH);
+  const anode = carbonateConcentrations(T, S, DIC, Terms.pH(anodePH));
+  const anodeH = Terms.pH(anodePH).concentrationH().normalize(Units.Molarity);
   const anodeOH = 1e-14 / anodeH;
 
   // Compute how many ions migrate across the interface, in mol/s.
@@ -365,8 +365,8 @@ function electrolysisIonMovement({ TC, S, DIC,
   // would be beneficial, in any case).
 
   const migrationOH = migration("OH-", cathodeOH);
-  const migrationHCO3 = migration("HCO3-", cathode.HCO3);
-  const migrationCO3 = migration("CO3^{2-}", cathode.CO3);
+  const migrationHCO3 = migration("HCO3-", cathode.HCO3.normalize(Units.Molarity));
+  const migrationCO3 = migration("CO3^{2-}", cathode.CO3.normalize(Units.Molarity));
   const migrationH = migration("H+", anodeH);
 
   // All of these migrating ions have the effect of lowering the pH in the
@@ -430,9 +430,12 @@ function electrolysisIonMovement({ TC, S, DIC,
 
   const diffusionH = diffusion("H+", anodeH - cathodeH);
   const diffusionOH = diffusion("OH-", cathodeOH - anodeOH);
-  const diffusionCO2 = diffusion("CO2", anode.CO2 - cathode.CO2);
-  const diffusionHCO3 = diffusion("HCO3-", cathode.HCO3 - anode.HCO3);
-  const diffusionCO3 = diffusion("CO3^{2-}", cathode.CO3 - anode.CO3);
+  const diffusionCO2 =
+    diffusion("CO2", anode.CO2.normalize(Units.Molarity) - cathode.CO2.normalize(Units.Molarity));
+  const diffusionHCO3 =
+    diffusion("HCO3-", cathode.HCO3.normalize(Units.Molarity) - anode.HCO3.normalize(Units.Molarity));
+  const diffusionCO3 =
+    diffusion("CO3^{2-}", cathode.CO3.normalize(Units.Molarity) - anode.CO3.normalize(Units.Molarity));
 
   // As with migration, any diffusion of these ions represents work lost while
   // alkalizing water in the compartment.
@@ -449,15 +452,15 @@ function electrolysisIonMovement({ TC, S, DIC,
   // For every two electrons conducted, at most one molecule of Cl2 will be
   // produced. The rate of active chlorine atom generation is then at most the
   // rate of conducted electrons.
-  const anodeCl = steadyStateChlorine(chargeRate, halfLife) / volume;
+  const anodeCl = steadyStateAmount(chargeRate, halfLife) / volume;
   const diffusionCl = diffusion("OCl-", anodeCl); // mol/s
 
   // The diffusion of chlorine into the cathode compartment is a point source.
   // Compute how much seawater is needed to dilute this chlorine to PNEC concentration.
   const chlorineWeight = diffusionCl / 35.45; // g/s
-  const chlorineDilution = steadyStateChlorine(chlorineWeight, halfLife) / 4.2e-8; // l
+  const chlorineRelease = Terms.Grams(steadyStateAmount(chlorineWeight, halfLife));
 
-  return { anodePH, migrationLoss, diffusionLoss, chlorineDilution };
+  return { migrationLoss, diffusionLoss, chlorineRelease };
 }
 
 module.exports = { electrolysisIonMovement };
