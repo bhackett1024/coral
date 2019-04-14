@@ -2,8 +2,8 @@
 
 "use strict";
 
-const { hydroxideRequirement } = require("../electrolysis");
-const { Units } = require("../units");
+const { hydroxideContributors } = require("../electrolysis");
+const { Units, Terms } = require("../units");
 const {
   expect,
   Temp_2100, Salinity_2100, DIC_2100, pH_2100,
@@ -13,16 +13,27 @@ const {
 // https://coral.wiki/wiki/index.php?title=Electrolysis
 //
 // Calculate the number of moles of hydroxide ions needed to alkalize one liter.
-//
-// Looking at the contributions of the various ions in hydroxideRequirement()
+const contributors =
+  hydroxideContributors(Temp_2100, Salinity_2100, DIC_2100, pH_2100, pH_Target);
+
+let requirement = Terms.Molarity(0);
+for (const v of Object.values(contributors)) {
+  requirement = requirement.add(v);
+}
+expect(requirement.normalize(Units.Molarity), 0.0002681740304786918);
+
+// Looking at the contributions of the various ions in hydroxideContributors()
 // gives a good sense of the buffering that happens in seawater and makes it
-// resistant to changes in pH. Of the hydroxide ions required to change the
-// pH to 8.2:
-//
-// 0.004% (1 in 24107) neutralizes an H+ ion.
-// 0.37% (1 in 264) is needed to maintain the equilibrium between [H+] and [OH-].
-// 91.3% is needed to neutralize H+ ions added as CO2 and HCO3- disassociate.
-// 8.3% is needed to bring boric acid species into equilibrium.
-expect(hydroxideRequirement(Temp_2100, Salinity_2100, DIC_2100, pH_2100,
-                            pH_Target).normalize(Units.Molarity),
-       0.00026814629975583607);
+// resistant to changes in pH.
+const contributorFractions = {};
+for (const [name,v] of Object.entries(contributors)) {
+  contributorFractions[name] = v.div(requirement).number();
+}
+expect(contributorFractions, {
+  "H+": 0.00004127332845367099,
+  "OH-": 0.003764172292604455,
+  "CO2": 0.11048097382654368,
+  "HCO3-": 0.7983541697869926,
+  "B(OH)4-": 0.08725600506722427,
+  "SO4^{2-}": 0.00010340569818143602
+});

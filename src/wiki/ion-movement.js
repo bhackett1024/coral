@@ -26,5 +26,5 @@ const movement = electrolysisIonMovement({
   current: Cell_InterfaceCurrent,
   startPH: pH_2100, endPH: pH_Target
 });
-expect(movement.migrationLoss + movement.diffusionLoss, 0.0026139061991214143);
+expect(movement.migrationLoss + movement.diffusionLoss, 0.0026116672231085575);
 expect(movement.chlorineRelease.div(Chlorine_PNEC).normalize(Units.CubicMeters), 41.97512535607783);

@@ -15,6 +15,14 @@ function boricAcidDisassociation() {
   return Terms.Molarity(5.8e-10);
 }
 
+// Compute the disassociation constant for HSO4- <-> H+ + SO4^{2-}
+function bisulfateDisassociation() {
+  // FIXME approximating here with the value for 25C.
+  // S. Zumdahl, S. Zumdahl, D. DeCoste
+  // Chemistry, Tenth Edition (Cengage Learning, 2014), pp A24
+  return Terms.Molarity(1.2e-2);
+}
+
 // Compute the potential in volts required to generate hydrogen and chlorine
 // gas via electrolysis of seawater.
 function electrolysisPotential(T, S, pH) {
@@ -47,19 +55,19 @@ function electrolysisPotential(T, S, pH) {
 }
 
 // Compute the number of hydroxide ions (mol OH-) needed to raise the pH of a
-// liter of water from startPH to endPH.
-function hydroxideRequirement(T, S, DIC, startPH, endPH) {
+// liter of water from startPH to endPH, with the contribution sorted by species.
+function hydroxideContributors(T, S, DIC, startPH, endPH) {
   // Compute the concentrations (mol/l) of different species at the initial and
   // final pH. For each of these species, determine the number of moles of OH-
   // ions needed to effect the change.
-  let newOH = Terms.Molarity(0);
+  const contributors = {};
 
   // [H+] decreases as pH increases. Each removed H+ ion must have been
   // neutralized by an introduced OH- ion.
   const startH = startPH.concentrationH();
   const endH = endPH.concentrationH();
   assert(endH.lessThan(startH));
-  newOH = newOH.add(startH.sub(endH));
+  contributors["H+"] = startH.sub(endH);
 
   // [OH-] increases as pH increases. As H+ ions are removed, additional OH-
   // ions are needed so that [H+] and [OH-] are in equilibrium according to the
@@ -68,7 +76,7 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   const startOH = Kw.div(startH);
   const endOH = Kw.div(endH);
   assert(startOH.lessThan(endOH));
-  newOH = newOH.add(endOH.sub(startOH));
+  contributors["OH-"] = endOH.sub(startOH);
 
   // As pH increases, the concentrations of CO2 and HCO3 will decrease, adding
   // H+ ions to the water which need to be neutralized by OH-. Compute the total
@@ -80,17 +88,15 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // CO2 is effectively H2CO3 (carbonic acid), which it must form before it can
   // disassociate to HCO3-. Carbonic acid is diprotic and two H+ ions are
   // generated when it completely disassociates.
-  newOH = newOH.add(startCarbonate.CO2.sub(endCarbonate.CO2).mul(Terms.Number(2)));
+  contributors["CO2"] = startCarbonate.CO2.sub(endCarbonate.CO2).mul(Terms.Number(2));
 
   // HCO3- is the conjugate base of H2CO3 but is an acid itself, releasing an H+
   // ion when it disassociates which must be neutralized.
-  newOH = newOH.add(startCarbonate.HCO3.sub(endCarbonate.HCO3));
+  contributors["HCO3-"] = startCarbonate.HCO3.sub(endCarbonate.HCO3);
 
   // Boric acid is also present in seawater, in low concentrations compared to
   // carbonate species.
   const Kb = boricAcidDisassociation();
-
-  // The total amount of boric acid species.
   const totalBoric = seawaterConcentration("B(OH)3", S).add(seawaterConcentration("B(OH)4-", S));
 
   // As pH increases, [B(OH)4-] increases. Each such ion needs an OH- ion to
@@ -105,9 +111,32 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   const startBorate = Kb.mul(totalBoric).div(startH.add(Kb));
   const endBorate = Kb.mul(totalBoric).div(endH.add(Kb));
   assert(startBorate.lessThan(endBorate));
-  newOH = newOH.add(endBorate.sub(startBorate));
+  contributors["B(OH)4-"] = endBorate.sub(startBorate);
 
-  return newOH;
+  // Sulfuric acid is also present in seawater, with sulfate concentrations about
+  // 10 times greater than DIC. This should be accounted for as well, though it
+  // does not have as large a buffering effect because H2SO4 completely disassociates
+  // and HSO4- is also a strong acid and mostly disassociates.
+  //
+  // The calculations here are analogous to those for boric acid.
+  const Ks = Terms.Molarity(1.2e-2);
+  const totalSulfate = seawaterConcentration("SO4^{2-}", S);
+  const startSulfate = Ks.mul(totalSulfate).div(startH.add(Ks));
+  const endSulfate = Ks.mul(totalSulfate).div(endH.add(Ks));
+  assert(startSulfate.lessThan(endSulfate));
+  contributors["SO4^{2-}"] = endSulfate.sub(startSulfate);
+
+  return contributors;
+}
+
+// Compute the total amount of hydroxide ions needed between the various contributors.
+function hydroxideRequirement(T, S, DIC, startPH, endPH) {
+  const contributors = hydroxideContributors(T, S, DIC, startPH, endPH);
+  let rv = Terms.Molarity(0);
+  for (const v of Object.values(contributors)) {
+    rv = rv.add(v);
+  }
+  return rv;
 }
 
 // Return how many amp-seconds are required to raise a volume V from startPH to endPH.
@@ -135,4 +164,10 @@ function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   return V.mul(amps).div(requirement);
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement };
+module.exports = {
+  electrolysisLimit,
+  electrolysisPotential,
+  electrolysisRequirement,
+  hydroxideContributors,
+  hydroxideRequirement
+};
