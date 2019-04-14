@@ -23,4 +23,4 @@ const {
 // 8.3% is needed to bring boric acid species into equilibrium.
 expect(hydroxideRequirement(Temp_2100, Salinity_2100, DIC_2100, pH_2100,
                             pH_Target).normalize(Units.Molarity),
-       0.00026402401575146737);
+       0.00026789885365241804);

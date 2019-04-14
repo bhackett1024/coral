@@ -19,8 +19,12 @@ function carbonateConcentrations(T, S, DIC, pH) {
   // constant and will be folded into the computation of K1. Given K1, K2, and
   // the total DIC, the concentrations [CO2], [HCO3^-], and [CO3^{2-}] can be
   // determined from [H+] according to the derivations below.
-  const K1 = associationK1(T, S);
-  const K2 = associationK2(T, S);
+  //
+  // FIXME per the paper cited below defining K1/K2, instead of [H+] this should be using
+  // [H+] + [HSO4-] + [HF], but trying to make this correction does not seem to
+  // give correct results.
+  const K1 = associationK1(T, S).normalize(Units.Molarity);
+  const K2 = associationK2(T, S).normalize(Units.Molarity);
 
   // DIC = [CO2] + [HCO3-] + [CO3^{2-}]
   // DIC = [CO2] + K1*[CO2]/[H+] + K2*K1*[CO2]/[H+]^2 (substituting equations below)
@@ -64,9 +68,6 @@ function generateBjerrumData(T, S, startPH, endPH, numPoints) {
   };
 }
 
-// Generate the data used in the carbonate species chart.
-// generateBjerrumData(28, 35, 4, 10, 20);
-
 // The methods below compute values of K1 and K2 for a given temperature and
 // salinity. These calculations are from:
 //
@@ -84,7 +85,7 @@ function associationK1(T, S) {
   const B = -530.123 * Math.sqrt(S) - 6.103 * S;
   const C = -2.06950 * Math.sqrt(S);
   const pK1 = pK1_0 + A + B / T + C * Math.log(T);
-  return Math.pow(10, -pK1);
+  return Terms.MolesPerSeawaterKg(Math.pow(10, -pK1));
 }
 
 // Compute the stoichiometric association constant for the second ionization of
@@ -97,7 +98,7 @@ function associationK2(T, S) {
   const B = -772.483 * Math.sqrt(S) - 20.051 * S;
   const C = -3.3336 * Math.sqrt(S);
   const pK2 = pK2_0 + A + B / T + C * Math.log(T);
-  return Math.pow(10, -pK2);
+  return Terms.MolesPerSeawaterKg(Math.pow(10, -pK2));
 }
 
 module.exports = { generateBjerrumData, carbonateConcentrations };
