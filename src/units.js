@@ -60,6 +60,13 @@ Term.prototype = {
     return new Term(this.value + v.value, this.components);
   },
 
+  sub(v) {
+    assert(v instanceof Term);
+    assert(componentsMatch(this.components, v.components),
+           `Components must match for sub: ${JSON.stringify(this.components)} ${JSON.stringify(v.components)}`);
+    return new Term(this.value - v.value, this.components);
+  },
+
   // Convert a dimensionless quantity to its number.
   number() {
     return this.normalize(Units.Number);
@@ -312,6 +319,14 @@ const Derived3 = {
     components: [
       { unit: Derived2.Liters },
       { unit: Base.Seconds, power: -1 }
+    ]
+  },
+
+  MolesSquaredPerLiterSquared: {
+    name: "mol^2 l^-2",
+    components: [
+      { unit: Base.Moles, power: 2 },
+      { unit: Derived2.Liters, power: -2 }
     ]
   },
 

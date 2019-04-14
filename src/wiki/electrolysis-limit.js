@@ -15,4 +15,4 @@ const {
 expect(electrolysisLimit(Terms.Watts(100),
                          Temp_2100, Salinity_2100, DIC_2100, pH_2100,
                          pH_Target).normalize(Units.LitersPerSecond),
-       2.1150184547588027);
+       2.115018454758804);

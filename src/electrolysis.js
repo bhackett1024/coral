@@ -18,8 +18,9 @@ const C = Avogadro / F;
 
 // Compute the disassociation constant for H2O <-> H+ + OH-
 function waterDisassociation() {
-  // FIXME approximating here with the value for 25C.
-  return 1e-14;
+  // FIXME approximating here with the value for 25C. This also has a different
+  // value in seawater due to different ionic activities.
+  return Terms.MolesSquaredPerLiterSquared(1e-14);
 }
 
 // Compute the disassociation constant for B(OH)3 + H2O <-> H+ + B(OH)4-
@@ -27,15 +28,12 @@ function boricAcidDisassociation() {
   // FIXMe approximating here with the value for 25C.
   // S. Zumdahl, S. Zumdahl, D. DeCoste
   // Chemistry, Tenth Edition (Cengage Learning, 2014), pp A24
-  return 5.8e-10;
+  return Terms.Molarity(5.8e-10);
 }
 
 // Compute the potential in volts required to generate hydrogen and chlorine
 // gas via electrolysis of seawater.
 function electrolysisPotential(T, S, pH) {
-  T = T.normalize(Units.Kelvin);
-  S = S.normalize(Units.Salinity);
-
   // Seawater electrolysis is based on the following half-reactions, with
   // standard reduction potentials:
   //
@@ -54,17 +52,16 @@ function electrolysisPotential(T, S, pH) {
   // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
   const ClStandard = Terms.MolesPerSeawaterKg(0.566);
 
-  const Cl = ClStandard.normalize(Units.Molarity) * S / 35;
+  const Cl = ClStandard.mul(S).div(Terms.Salinity(35));
 
   // pH is -log([H+]). [OH-] can be calculated from this using the dissociation
   // constant for water, Kw.
   const Kw = waterDisassociation();
-  const H = pH.concentrationH().normalize(Units.Molarity);
-  const OH = Kw / H;
+  const OH = Kw.div(pH.concentrationH());
 
   // Compute the actual potential using the Nernst equation.
-  const Q = Math.pow(OH, 2) / Math.pow(Cl, 2);
-  return Terms.Volts(-2.19 - R * T / (2 * F) * Math.log(Q));
+  const Q = Math.pow(OH.normalize(Units.Molarity), 2) / Math.pow(Cl.normalize(Units.Molarity), 2);
+  return Terms.Volts(-2.19 - R * T.normalize(Units.Kelvin) / (2 * F) * Math.log(Q));
 }
 
 // Compute the number of hydroxide ions (mol OH-) needed to raise the pH of a
@@ -73,23 +70,23 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // Compute the concentrations (mol/l) of different species at the initial and
   // final pH. For each of these species, determine the number of moles of OH-
   // ions needed to effect the change.
-  let newOH = 0;
+  let newOH = Terms.Molarity(0);
 
   // [H+] decreases as pH increases. Each removed H+ ion must have been
   // neutralized by an introduced OH- ion.
-  const startH = startPH.concentrationH().normalize(Units.Molarity);
-  const endH = endPH.concentrationH().normalize(Units.Molarity);
-  assert(endH < startH);
-  newOH += startH - endH;
+  const startH = startPH.concentrationH();
+  const endH = endPH.concentrationH();
+  assert(endH.normalize(Units.Molarity) < startH.normalize(Units.Molarity));
+  newOH = newOH.add(startH.sub(endH));
 
   // [OH-] increases as pH increases. As H+ ions are removed, additional OH-
   // ions are needed so that [H+] and [OH-] are in equilibrium according to the
   // disassociation constant Kw of water.
   const Kw = waterDisassociation();
-  const startOH = Kw / startH;
-  const endOH = Kw / endH;
-  assert(endOH > startOH);
-  newOH += endOH - startOH;
+  const startOH = Kw.div(startH);
+  const endOH = Kw.div(endH);
+  assert(endOH.normalize(Units.Molarity) > startOH.normalize(Units.Molarity));
+  newOH = newOH.add(endOH.sub(startOH));
 
   // As pH increases, the concentrations of CO2 and HCO3 will decrease, adding
   // H+ ions to the water which need to be neutralized by OH-. Compute the total
@@ -98,19 +95,14 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   const startCarbonate = carbonateConcentrations(T, S, DIC, startPH);
   const endCarbonate = carbonateConcentrations(T, S, DIC, endPH);
 
-  const startCO2 = startCarbonate.CO2.normalize(Units.Molarity);
-  const endCO2 = endCarbonate.CO2.normalize(Units.Molarity);
-  const startHCO3 = startCarbonate.HCO3.normalize(Units.Molarity);
-  const endHCO3 = endCarbonate.HCO3.normalize(Units.Molarity);
-
   // CO2 is effectively H2CO3 (carbonic acid), which it must form before it can
   // disassociate to HCO3-. Carbonic acid is diprotic and two H+ ions are
   // generated when it completely disassociates.
-  newOH += 2 * (startCO2 - endCO2);
+  newOH = newOH.add(startCarbonate.CO2.sub(endCarbonate.CO2).mul(Terms.Number(2)));
 
   // HCO3- is the conjugate base of H2CO3 but is an acid itself, releasing an H+
   // ion when it disassociates which must be neutralized.
-  newOH += startHCO3 - endHCO3;
+  newOH = newOH.add(startCarbonate.HCO3.sub(endCarbonate.HCO3));
 
   // Boric acid is also present in seawater, in low concentrations compared to
   // carbonate species.
@@ -120,8 +112,7 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
   const totalBoricStandard = Terms.MolesPerSeawaterKg(0.0001045 + 0.0003259);
 
-  const totalBoric =
-    totalBoricStandard.normalize(Units.Molarity) * S.normalize(Units.Salinity) / 35;
+  const totalBoric = totalBoricStandard.mul(S).div(Terms.Salinity(35));
 
   // As pH increases, [B(OH)4-] increases. Each such ion needs an OH- ion to
   // form from B(OH)3.
@@ -132,12 +123,12 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // Kb[TotalBoric] = [H+][B(OH)4-] + Kb[B(OH)4-]
   // Kb[TotalBoric] = ([H+] + Kb)[B(OH)4-]
   // [B(OH)4-] = Kb[TotalBoric] / ([H+] + Kb)
-  const startBorate = Kb * totalBoric / (startH + Kb);
-  const endBorate = Kb * totalBoric / (endH + Kb);
-  assert(startBorate < endBorate);
-  newOH += endBorate - startBorate;
+  const startBorate = Kb.mul(totalBoric).div(startH.add(Kb));
+  const endBorate = Kb.mul(totalBoric).div(endH.add(Kb));
+  assert(startBorate.normalize(Units.Molarity) < endBorate.normalize(Units.Molarity));
+  newOH = newOH.add(endBorate.sub(startBorate));
 
-  return Terms.Molarity(newOH);
+  return newOH;
 }
 
 // Return how many amp-seconds are required to raise a volume V from startPH to endPH.
