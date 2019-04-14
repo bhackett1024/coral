@@ -5,8 +5,10 @@ const { Units, Terms } = require("./units");
 
 // Compute the concentration of carbonate species.
 function carbonateConcentrations(T, S, DIC, pH) {
-  const H = pH.concentrationH().normalize(Units.Molarity);
-  DIC = DIC.normalize(Units.Molarity);
+  // FIXME per the paper cited below defining K1/K2, instead of [H+] this should be using
+  // [H+] + [HSO4-] + [HF], but trying to make this correction does not seem to
+  // give correct results.
+  const H = pH.concentrationH();
 
   // At equilibrium, the concentrations of the compounds in each reaction are
   // related according to the following equations:
@@ -19,34 +21,26 @@ function carbonateConcentrations(T, S, DIC, pH) {
   // constant and will be folded into the computation of K1. Given K1, K2, and
   // the total DIC, the concentrations [CO2], [HCO3^-], and [CO3^{2-}] can be
   // determined from [H+] according to the derivations below.
-  //
-  // FIXME per the paper cited below defining K1/K2, instead of [H+] this should be using
-  // [H+] + [HSO4-] + [HF], but trying to make this correction does not seem to
-  // give correct results.
-  const K1 = associationK1(T, S).normalize(Units.Molarity);
-  const K2 = associationK2(T, S).normalize(Units.Molarity);
+  const K1 = associationK1(T, S);
+  const K2 = associationK2(T, S);
 
   // DIC = [CO2] + [HCO3-] + [CO3^{2-}]
   // DIC = [CO2] + K1*[CO2]/[H+] + K2*K1*[CO2]/[H+]^2 (substituting equations below)
   // DIC = [CO2](1 + K1/[H+] + K2*K1/[H+]^2)
   // [CO2] = DIC / (1 + K1/[H+] + K2*K1/[H+]^2)
-  const CO2 = DIC / (1 + K1 / H + K1 * K2 / (H * H));
+  const CO2 = DIC.div(Terms.Number(1).add(K1.div(H)).add(K1.mul(K2).div(H.mul(H))));
 
   // [H+][HCO3-]/[CO2] = K1
   // [HCO3-] = K1*[CO2]/[H+]
-  const HCO3 = K1 * CO2 / H;
+  const HCO3 = K1.mul(CO2).div(H);
 
   // [H+][CO3^{2-}]/[HCO3-] = K2
   // [CO3^{2-}] = K2*[HCO3-]/[H+]
   // [CO3^{2-}] = K2*(K1*[CO2]/[H+])/[H+]
   // [CO3^{2-}] = K2*K1*[CO2]/[H+]^2
-  const CO3 = K2 * K1 * CO2 / (H * H);
+  const CO3 = K2.mul(K1).mul(CO2).div(H.mul(H));
 
-  return {
-    CO2: Terms.Molarity(CO2),
-    HCO3: Terms.Molarity(HCO3),
-    CO3: Terms.Molarity(CO3)
-  };
+  return { CO2, HCO3, CO3 };
 }
 
 // Generate data for a Bjerrum plot of carbonate concentrations against pH.
