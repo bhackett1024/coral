@@ -7,8 +7,6 @@ const { Units, Terms } = require("./units");
 // of CO2 from the atmosphere into the water after raising the water pH from
 // startPH to endPH.
 function neutralizeRequirement(T, S, DIC, startPH, endPH, windSpeed) {
-  windSpeed = windSpeed.normalize(Units.MetersPerSecond);
-
   const startCarbonate = carbonateConcentrations(T, S, DIC, startPH);
   const endCarbonate = carbonateConcentrations(T, S, DIC, endPH);
 
@@ -19,9 +17,7 @@ function neutralizeRequirement(T, S, DIC, startPH, endPH, windSpeed) {
   // We can simplify this by assuming that the atmosphere is in equilibrium with
   // the amount of CO2 in the water at startPH. The CO2 imbalance is then the
   // difference in CO2 concentrations between the two different values of pH.
-  const imbalance =
-    (startCarbonate.CO2.normalize(Units.Molarity) -
-     endCarbonate.CO2.normalize(Units.Molarity)) / 1000; // mol cm^-3
+  const imbalance = startCarbonate.CO2.sub(endCarbonate.CO2);
 
   // The rate at which atmospheric CO2 will enter the water to correct this
   // imbalance depends on the sea state. The windier is, the more turbulent the
@@ -40,6 +36,7 @@ function neutralizeRequirement(T, S, DIC, startPH, endPH, windSpeed) {
 
   // Use the formulae for calculating kw as given in the above reference,
   // normalized to a Schmidt number of 600 (CO2 at 20C).
+  windSpeed = windSpeed.normalize(Units.MetersPerSecond);
   let kw; // cm/h
   if (windSpeed < 3.6) {
     kw = 0.17 * windSpeed;
@@ -56,16 +53,16 @@ function neutralizeRequirement(T, S, DIC, startPH, endPH, windSpeed) {
     kw = kw * Math.pow(360, -0.5) / Math.pow(600, -.5);
   }
 
-  const CO2flux = imbalance * kw * 100 * 100; // mol m^-2 h^-1
+  const CO2flux = Terms.CentimetersPerHour(kw).mul(imbalance);
 
   // The CO2 entering the water will disassociate according to the carbonate
   // concentrations at the pH the water was raised to. In order to keep the pH
   // stable, we need OH to neutralize the H+ ion added when H2CO3 disassociates
   // to HCO3, and the two H+ ions added when H2CO3 fully disassociates to CO3.
-  const HCO3Fraction = endCarbonate.HCO3.normalize(Units.Molarity) / DIC.normalize(Units.Molarity);
-  const CO3Fraction = endCarbonate.CO3.normalize(Units.Molarity) / DIC.normalize(Units.Molarity);
+  const HCO3Fraction = endCarbonate.HCO3.div(DIC);
+  const CO3Fraction = endCarbonate.CO3.div(DIC);
 
-  return Terms.MolesPerSquareMeterHour(CO2flux * (HCO3Fraction + CO3Fraction * 2));
+  return CO2flux.mul(HCO3Fraction.add(CO3Fraction.mul(Terms.Number(2))));
 }
 
 module.exports = { neutralizeRequirement };

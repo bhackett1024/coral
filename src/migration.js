@@ -1,15 +1,15 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
 const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
-const { F, hydroxideRequirement } = require("./electrolysis");
+const { F, hydroxideRequirement, waterDisassociation } = require("./electrolysis");
 const { steadyStateAmount } = require("./chlorine");
 const { Units, Terms } = require("./units");
 
 function solveForParameter(start, end, fn) {
   for (var i = 0; i < 30; i++) {
-    const middle = (start + end) / 2;
+    const middle = start.add(end).div(Terms.Number(2));
     const value = fn(middle);
-    if (value < 0) {
+    if (value.isNegative()) {
       end = middle;
     } else {
       start = middle;
@@ -20,7 +20,7 @@ function solveForParameter(start, end, fn) {
 
 function integrate(start, end, fn) {
   // How many points to include when integrating.
-  const count = 100000;
+  const count = 10000;
 
   const diff = end - start;
   let total = 0;
@@ -43,6 +43,10 @@ function integrate(start, end, fn) {
 // computationally expensive to determine accurately and vulnerable to roundoff
 // errors.
 function diffusion1(interfaceConcentration, coefficient, time) {
+  interfaceConcentration = interfaceConcentration.normalize(Units.MolesPerCubicMeter);
+  coefficient = coefficient.normalize(Units.SquareMetersPerSecond);
+  time = time.normalize(Units.Seconds);
+
   // Diffusion in one dimension proceeds according to the PDE:
   //
   // dC(x,t)/dt = D * d^2C(x,t)/dx^2
@@ -106,9 +110,10 @@ function diffusion1(interfaceConcentration, coefficient, time) {
   }
 
   // Compute Integral_0..1 C(x,t) dx
-  return integrate(0, 1, x => {
+  const rv = integrate(0, 1, x => {
     return Cprime(x, time) + interfaceConcentration * (1 - x);
   });
+  return Terms.MolesPerSquareMeter(rv);
 }
 
 // This implementation uses Laplace transforms. The solution is more complicated
@@ -200,9 +205,10 @@ function diffusion2(interfaceConcentration, coefficient, time) {
   // Therefore:
   //
   // Integral_0..infinity C(x,t) dx = Ci / (sqrt(pi) * 1/(2*sqrt(D*t)))
-  // Integral_0..infinity C(x,t) dx = Ci * 2 * sqrt(D*t) / (sqrt(pi)
+  // Integral_0..infinity C(x,t) dx = Ci * 2 * sqrt(D*t) / sqrt(pi)
 
-  return interfaceConcentration * 2 * Math.sqrt(coefficient * time) / Math.sqrt(Math.PI);
+  const factor = Terms.Number(2 / Math.sqrt(Math.PI));
+  return interfaceConcentration.mul(factor).mul(coefficient.mul(time).sqrt());
 }
 
 // For species of interest, track the following information:
@@ -238,6 +244,17 @@ const gSpecies = {
   // Estimate the diffusion coefficient for OCl- using that of CL-.
   "OCl-": { diffusion: 2.03 * 1e-9 }
 };
+for (const entry of Object.values(gSpecies)) {
+  if (entry.conductivity) {
+    entry.conductivity = Terms.SiemensSquareCentimersPerMole(entry.conductivity);
+  }
+  if (entry.diffusion) {
+    entry.diffusion = Terms.SquareMetersPerSecond(entry.diffusion);
+  }
+  if (entry.charge) {
+    entry.charge = Terms.Number(entry.charge);
+  }
+}
 
 // Compute the approximate contribution of an ion to the conductivity of a
 // solution, based on its molarity and limiting equivalent conductivity.
@@ -248,11 +265,9 @@ const gSpecies = {
 // conductivity of the solution. There are methods to calculate conductivity
 // which account for this but these depend on additional constants determined
 // experimentally which are hard to find values for.
-function ionConductivity(name, molarity) {
+function ionConductivity(name, concentration) {
   const { conductivity, charge } = gSpecies[name];
-  const molaritycm = molarity / 1000; // mol/cm^3
-  const conductivitycm = molaritycm * conductivity * Math.abs(charge); // S/cm
-  return conductivitycm * 100; // S/m
+  return concentration.mul(conductivity).mul(charge.abs());
 }
 
 // Concentrations of the major ionic species in seawater (99.9% of ions,
@@ -261,23 +276,22 @@ function ionConductivity(name, molarity) {
 // Frank J. Millero
 // Chemical Oceanography (CRC Press, 2013) page 67
 const seawaterIons = {
-  "Na+": 0.486,
-  "Cl-": 0.567,
-  "Mg^{2+}": 0.055,
-  "Ca^{2+}": 0.011,
-  "K+": 0.011,
-  "SO4^{2-}": 0.029
+  "Na+": Terms.MolesPerSeawaterKg(0.486),
+  "Cl-": Terms.MolesPerSeawaterKg(0.567),
+  "Mg^{2+}": Terms.MolesPerSeawaterKg(0.055),
+  "Ca^{2+}": Terms.MolesPerSeawaterKg(0.011),
+  "K+": Terms.MolesPerSeawaterKg(0.011),
+  "SO4^{2-}": Terms.MolesPerSeawaterKg(0.029)
 };
 
-let seawaterConductivity = 0;
-for (const [name, molkg] of Object.entries(seawaterIons)) {
-  const molarity = Terms.MolesPerSeawaterKg(molkg).normalize(Units.Molarity);
-  seawaterConductivity += ionConductivity(name, molarity);
+let seawaterConductivity = Terms.SiemensPerMeter(0);
+for (const [name, concentration] of Object.entries(seawaterIons)) {
+  seawaterConductivity = seawaterConductivity.add(ionConductivity(name, concentration));
 }
-// > print(seawaterConductivity);
-// 7.924810152499999
+// > console.log(seawaterConductivity.normalize(SiemensPerMeter));
+// 8.212238499999998
 //
-// Seawater is actually 5.3 S/m. The calculated value is 50% higher due to the
+// Seawater is actually 5.3 S/m. The calculated value is 55% higher due to the
 // overapproximation made in ionConductivity().
 
 // Calculate movement due to migration and diffusion of ions and other species
@@ -295,13 +309,6 @@ for (const [name, molkg] of Object.entries(seawaterIons)) {
 function electrolysisIonMovement({ T, S, DIC,
                                    amps, halfLife, volume, outflow, interface, current,
                                    startPH, endPH }) {
-  amps = amps.normalize(Units.Amperes);
-  halfLife = halfLife.normalize(Units.Seconds);
-  volume = volume.normalize(Units.Liters);
-  outflow = outflow.normalize(Units.LitersPerSecond);
-  interface = interface.normalize(Units.SquareCentimeters);
-  current = current.normalize(Units.CentimetersPerSecond);
-
   // Here are the species that can have different concentrations in the two
   // compartments, and whose movements we need to account for:
   //
@@ -310,7 +317,7 @@ function electrolysisIonMovement({ T, S, DIC,
   // Cl2/HOCl/OCl-
 
   // How much charge moves between compartments.
-  const chargeRate = amps / F.normalize(Units.CoulombsPerMole); // mol/s
+  const chargeRate = amps.div(F); // mol/s
 
   // Compute the steady state pH of the anode compartment: enough H+ is produced
   // each second to lower the inflow of water (equal to the outflow) from the
@@ -321,24 +328,23 @@ function electrolysisIonMovement({ T, S, DIC,
   // between the compartments. If the anode produces O2 then this happens
   // immediately, while if the anode produces Cl2 then the H+ forms as the
   // Cl2 disassociates.
-  const anodePH = solveForParameter(1, startPH.normalize(Units.pH), (pH) => {
-    const requirement =
-      hydroxideRequirement(T, S, DIC, Terms.pH(pH), startPH).normalize(Units.Molarity);
-    return requirement * outflow - chargeRate;
+  const anodePH = solveForParameter(Terms.pH(1), startPH, (pH) => {
+    const requirement = hydroxideRequirement(T, S, DIC, pH, startPH);
+    return requirement.mul(outflow).sub(chargeRate);
   });
 
   // Concentrations in the cathode compartment.
   const cathode = carbonateConcentrations(T, S, DIC, endPH);
-  const cathodeH = endPH.concentrationH().normalize(Units.Molarity);
-  const cathodeOH = 1e-14 / cathodeH;
+  const cathodeH = endPH.concentrationH();
+  const cathodeOH = waterDisassociation().div(cathodeH);
 
   // Concentrations in the anode compartment.
-  const anode = carbonateConcentrations(T, S, DIC, Terms.pH(anodePH));
-  const anodeH = Terms.pH(anodePH).concentrationH().normalize(Units.Molarity);
-  const anodeOH = 1e-14 / anodeH;
+  const anode = carbonateConcentrations(T, S, DIC, anodePH);
+  const anodeH = anodePH.concentrationH();
+  const anodeOH = waterDisassociation().div(anodeH);
 
   // Compute how many ions migrate across the interface, in mol/s.
-  function migration(name, molarity) {
+  function migration(name, concentration) {
     // The transport number for an ion is the fraction of current which it
     // carries. In general these should be determined experimentally, but they can
     // be approximated using the fraction of their equivalent ionic conductivity
@@ -347,8 +353,8 @@ function electrolysisIonMovement({ T, S, DIC,
     // Allen J. Bard, Larry R. Faulkner
     // Electrochemical methods: fundamentals and applications, 2nd ed. (John Wiley & Sons Inc, 2001), page 67
     const { charge } = gSpecies[name];
-    const transport = ionConductivity(name, molarity) / seawaterConductivity;
-    return transport * chargeRate / Math.abs(charge);
+    const transport = ionConductivity(name, concentration).div(seawaterConductivity);
+    return transport.mul(chargeRate).div(charge.abs());
   }
 
   // The anode consumes Cl- and/or produces H+, while the cathode produces OH-.
@@ -365,8 +371,8 @@ function electrolysisIonMovement({ T, S, DIC,
   // would be beneficial, in any case).
 
   const migrationOH = migration("OH-", cathodeOH);
-  const migrationHCO3 = migration("HCO3-", cathode.HCO3.normalize(Units.Molarity));
-  const migrationCO3 = migration("CO3^{2-}", cathode.CO3.normalize(Units.Molarity));
+  const migrationHCO3 = migration("HCO3-", cathode.HCO3);
+  const migrationCO3 = migration("CO3^{2-}", cathode.CO3);
   const migrationH = migration("H+", anodeH);
 
   // All of these migrating ions have the effect of lowering the pH in the
@@ -376,8 +382,9 @@ function electrolysisIonMovement({ T, S, DIC,
   // Since every electron transferred generates OH- at the cathode, the work
   // lost due to migration is the same as the fraction of current which
   // transports these ions.
-  const migrationTotal = migrationOH + migrationHCO3 + 2 * migrationCO3 + migrationH;
-  const migrationLoss = migrationTotal / chargeRate;
+  const migrationTotal =
+    migrationOH.add(migrationHCO3).add(migrationCO3.cmul(2)).add(migrationH);
+  const migrationLoss = migrationTotal.div(chargeRate).number();
 
   // A species will diffuse from a compartment where it is at higher concentration
   // to the compartment where it is at a lower concentration. The rate of
@@ -403,24 +410,21 @@ function electrolysisIonMovement({ T, S, DIC,
 
   // The time taken for water to sweep past the interface. We assume the interface
   // region is square.
-  const refreshTime = Math.sqrt(interface) / current; // s
+  const refreshTime = interface.sqrt().div(current); // s
 
   // Compute the rate of diffusion across the interface, in mol/s.
   //
   // concentrationDifference (mol/l)
   // coefficient (m^2/s)
   function diffusion(name, concentrationDifference) {
-    if (concentrationDifference <= 0) {
-      return 0;
+    if (concentrationDifference.isNegative()) {
+      return Terms.MolesPerSecond(0);
     }
     const { diffusion: coefficient } = gSpecies[name];
-    const diffm = concentrationDifference * 1000; // mol/m^3
 
     // Change this to diffusion1 to compare implementations.
-    const rate = diffusion2(diffm, coefficient, refreshTime); // mol/m^2
-
-    const interfacem = interface / 100 / 100; // m^2
-    return rate * interfacem / refreshTime; // mol/s
+    const rate = diffusion2(concentrationDifference, coefficient, refreshTime); // mol/m^2
+    return rate.mul(interface).div(refreshTime); // mol/s
   }
 
   // Diffusing species we have to worry about:
@@ -428,19 +432,16 @@ function electrolysisIonMovement({ T, S, DIC,
   // Cathode -> Anode: OH-, HCO3-, CO3^{2-}
   // Anode -> Cathode: H+, CO2, Cl2/HOCl/OCl-
 
-  const diffusionH = diffusion("H+", anodeH - cathodeH);
-  const diffusionOH = diffusion("OH-", cathodeOH - anodeOH);
-  const diffusionCO2 =
-    diffusion("CO2", anode.CO2.normalize(Units.Molarity) - cathode.CO2.normalize(Units.Molarity));
-  const diffusionHCO3 =
-    diffusion("HCO3-", cathode.HCO3.normalize(Units.Molarity) - anode.HCO3.normalize(Units.Molarity));
-  const diffusionCO3 =
-    diffusion("CO3^{2-}", cathode.CO3.normalize(Units.Molarity) - anode.CO3.normalize(Units.Molarity));
+  const diffusionH = diffusion("H+", anodeH.sub(cathodeH));
+  const diffusionOH = diffusion("OH-", cathodeOH.sub(anodeOH));
+  const diffusionCO2 = diffusion("CO2", anode.CO2.sub(cathode.CO2));
+  const diffusionHCO3 = diffusion("HCO3-", cathode.HCO3.sub(anode.HCO3));
+  const diffusionCO3 = diffusion("CO3^{2-}", cathode.CO3.sub(anode.CO3));
 
   // As with migration, any diffusion of these ions represents work lost while
   // alkalizing water in the compartment.
-  const diffusionTotal = diffusionH + diffusionOH + diffusionCO2 * 2 + diffusionHCO3 + diffusionCO3 * 2;
-  const diffusionLoss = diffusionTotal / chargeRate;
+  const diffusionTotal = diffusionH.add(diffusionOH).add(diffusionCO2.cmul(2)).add(diffusionHCO3).add(diffusionCO3.cmul(2));
+  const diffusionLoss = diffusionTotal.div(chargeRate).number();
 
   // Chlorine compounds do not affect pH, but we need to keep track of them to
   // manage diffusion of these toxic compounds into the cathode compartment.
@@ -452,13 +453,13 @@ function electrolysisIonMovement({ T, S, DIC,
   // For every two electrons conducted, at most one molecule of Cl2 will be
   // produced. The rate of active chlorine atom generation is then at most the
   // rate of conducted electrons.
-  const anodeCl = steadyStateAmount(Terms.MolesPerSecond(chargeRate), Terms.Seconds(halfLife)).normalize(Units.Moles) / volume;
+  const anodeCl = steadyStateAmount(chargeRate, halfLife).div(volume);
   const diffusionCl = diffusion("OCl-", anodeCl); // mol/s
 
   // The diffusion of chlorine into the cathode compartment is a point source.
   // Compute how much seawater is needed to dilute this chlorine to PNEC concentration.
-  const chlorineWeight = diffusionCl / 35.45; // g/s
-  const chlorineRelease = steadyStateAmount(Terms.GramsPerSecond(chlorineWeight), Terms.Seconds(halfLife));
+  const chlorineWeight = diffusionCl.mul(Terms.GramsPerMole(35.45)); // g/s
+  const chlorineRelease = steadyStateAmount(chlorineWeight, halfLife);
 
   return { migrationLoss, diffusionLoss, chlorineRelease };
 }

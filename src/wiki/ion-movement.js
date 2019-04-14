@@ -8,7 +8,7 @@ const {
   Cell_Amps, Cell_PrimaryCompartment, Cell_Outflow,
   Cell_InterfaceSize, Cell_InterfaceCurrent
 } = require("./utils");
-const { Units } = require("../units");
+const { Units, Terms } = require("../units");
 
 // https://coral.wiki/wiki/index.php?title=Electrolysis
 //
@@ -24,6 +24,5 @@ const movement = electrolysisIonMovement({
   current: Cell_InterfaceCurrent,
   startPH: pH_2100, endPH: pH_Target
 });
-expect(movement.migrationLoss + movement.diffusionLoss, 0.004339472992548044);
-expect(movement.chlorineRelease.normalize(Units.Grams) /
-       Chlorine_PNEC.normalize(Units.GramsPerLiter), 94.472305992669);
+expect(movement.migrationLoss + movement.diffusionLoss, 0.0026140847798249486);
+expect(movement.chlorineRelease.div(Chlorine_PNEC).normalize(Units.CubicMeters), 41.97512535607783);

@@ -54,6 +54,19 @@ Term.prototype = {
     return new Term(this.value * v.value, newComponents);
   },
 
+  cmul(n) {
+    return this.mul(Terms.Number(n));
+  },
+
+  sqrt() {
+    const newComponents = cloneComponents(this.components);
+    for (const entry of newComponents) {
+      assert(entry.power % 2 == 0);
+      entry.power /= 2;
+    }
+    return new Term(Math.sqrt(this.value), newComponents);
+  },
+
   add(v) {
     assert(v instanceof Term);
     assert(componentsMatch(this.components, v.components),
@@ -76,6 +89,10 @@ Term.prototype = {
     return this.value < v.value;
   },
 
+  isNegative() {
+    return this.value < 0;
+  },
+
   // Convert a dimensionless quantity to its number.
   number() {
     return this.normalize(Units.Number);
@@ -84,6 +101,11 @@ Term.prototype = {
   // Get the natural logarithm of a dimensionless quantity.
   naturalLogarithm() {
     return Terms.Number(Math.log(this.number()));
+  },
+
+  // Get the absolute value of a dimensionless quantity.
+  abs() {
+    return Terms.Number(Math.abs(this.number()));
   },
 
   // Get the concentration of H+ for a given pH.
@@ -235,10 +257,31 @@ const Derived1 = {
     ]
   },
 
+  GramsPerMole: {
+    name: "g/mol",
+    components: [
+      { unit: Base.Grams },
+      { unit: Base.Moles, power: -1 }
+    ]
+  },
+
+  CubicMeters: {
+    name: "m^3",
+    components: [ { unit: Base.Meters, power: 3 } ]
+  },
+
   MetersPerSecond: {
     name: "m/s",
     components: [
       { unit: Base.Meters },
+      { unit: Base.Seconds, power: -1 }
+    ]
+  },
+
+  SquareMetersPerSecond: {
+    name: "m^2/s",
+    components: [
+      { unit: Base.Meters, power: 2 },
       { unit: Base.Seconds, power: -1 }
     ]
   },
@@ -248,6 +291,22 @@ const Derived1 = {
     components: [
       { unit: Base.Moles },
       { unit: Base.Seconds, power: -1 }
+    ]
+  },
+
+  MolesPerSquareMeter: {
+    name: "mol/m^2",
+    components: [
+      { unit: Base.Moles },
+      { unit: Base.Meters, power: -2 }
+    ]
+  },
+
+  MolesPerCubicMeter: {
+    name: "mol/m^3",
+    components: [
+      { unit: Base.Moles },
+      { unit: Base.Meters, power: -3 }
     ]
   },
 
@@ -310,6 +369,14 @@ const Derived2 = {
     ]
   },
 
+  CentimetersPerHour: {
+    name: "cm/h",
+    components: [
+      { unit: Derived1.Centimeters },
+      { unit: Derived1.Hours, power: -1 }
+    ]
+  },
+
   MolesPerSquareMeterHour: {
     name: "mol m^-2 h^-1",
     components: [
@@ -332,6 +399,14 @@ const Derived2 = {
     components: [
       { unit: Derived1.Amperes },
       { unit: Base.Seconds }
+    ]
+  },
+
+  Ohms: {
+    name: "Ω",
+    components: [
+      { unit: Derived1.Volts },
+      { unit: Derived1.Amperes, power: -1 }
     ]
   },
 };
@@ -369,6 +444,13 @@ const Derived3 = {
     ]
   },
 
+  Siemens: {
+    name: "S",
+    components: [
+      { unit: Derived2.Ohms, power: -1 }
+    ]
+  },
+
   // A kilogram of seawater as a unit of volume.
   SeawaterKg: {
     name: "kg-sw",
@@ -378,13 +460,30 @@ const Derived3 = {
 };
 
 const Derived4 = {
+  SiemensPerMeter: {
+    name: "S/m",
+    components: [
+      { unit: Derived3.Siemens },
+      { unit: Base.Meters, power: -1 }
+    ]
+  },
+
+  SiemensSquareCentimersPerMole: {
+    name: "S cm^2 mol^-1",
+    components: [
+      { unit: Derived3.Siemens },
+      { unit: Derived1.Centimeters, power: 2 },
+      { unit: Base.Moles, power: -1 }
+    ]
+  },
+
   MolesPerSeawaterKg: {
     name: "mol/kg-sw",
     components: [
       { unit: Base.Moles },
       { unit: Derived3.SeawaterKg, power: -1 }
     ]
-  }
+  },
 };
 
 const Units = {

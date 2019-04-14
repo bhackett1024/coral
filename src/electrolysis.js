@@ -151,4 +151,4 @@ function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   return V.mul(amps).div(requirement);
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, F };
+module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, waterDisassociation, F };

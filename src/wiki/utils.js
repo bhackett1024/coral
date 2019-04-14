@@ -77,7 +77,7 @@ const Cell_Outflow = LitersPerSecond(0.2);
 
 // Size of the interface between the anode and cathode compartments, across
 // which species can move (cm^2).
-const Cell_InterfaceSize = SquareCentimeters(16);
+const Cell_InterfaceSize = SquareCentimeters(4);
 
 // Speed of the current passing along the interface between compartments (cm/s).
 const Cell_InterfaceCurrent = CentimetersPerSecond(25);

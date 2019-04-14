@@ -16,4 +16,4 @@ const {
 // wind speed of 6 m/s.
 expect(neutralizeRequirement(Temp_2100, Salinity_2100, DIC_2100, pH_2100, pH_Target,
                              Terms.MetersPerSecond(6)).normalize(Units.MolesPerSquareMeterHour),
-       0.001666281067108141);
+       0.0016662810671081404);
