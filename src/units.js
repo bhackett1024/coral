@@ -484,6 +484,14 @@ const Derived4 = {
       { unit: Derived3.SeawaterKg, power: -1 }
     ]
   },
+
+  MolesSquaredPerSeawaterKgSquared: {
+    name: "mol^2 kg-sw^-2",
+    components: [
+      { unit: Base.Moles, power: 2 },
+      { unit: Derived3.SeawaterKg, power: -2 }
+    ]
+  },
 };
 
 const Units = {

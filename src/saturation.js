@@ -5,7 +5,7 @@ const { Units, Terms } = require("./units");
 
 function aragoniteSaturation(T, S, DIC, pH) {
   // Compute CO3 concentration based on the environment.
-  const CO3 = carbonateConcentrations(T, S, DIC, pH).CO3.normalize(Units.MolesPerSeawaterKg);
+  const CO3 = carbonateConcentrations(T, S, DIC, pH).CO3;
 
   // Ca concentration varies little relative to other salts in seawater, and can
   // be estimated using the water's salinity.
@@ -36,7 +36,7 @@ function aragoniteSaturation(T, S, DIC, pH) {
   // The saturation state is the ratio [CO3][Ca]/Ksp. If this is 1 then the
   // solution is saturated, if below 1 the solution is undersaturated, and
   // if above 1 the solution is supersaturated.
-  return CO3 * Ca.normalize(Units.MolesPerSeawaterKg) / Ksp;
+  return CO3.mul(Ca).div(Ksp).number();
 }
 
 // The method below computes the solubility product of Aragonite for a given
@@ -60,7 +60,7 @@ function associationKspAragonite(T, S) {
   const B = -0.10018;
   const C = 0.0059415;
   const logKsp = logKsp_thermodynamic + A * Math.sqrt(S) + B * S + C * Math.pow(S, 1.5);
-  return Math.pow(10, logKsp);
+  return Terms.MolesSquaredPerSeawaterKgSquared(Math.pow(10, logKsp));
 }
 
 module.exports = { aragoniteSaturation };
