@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { electrolysisPotential } = require("../electrolysis");
 const { Units } = require("../units");
 const { expect, Temp_2100, Salinity_2100, DIC_2100, pH_2100 } = require("./utils");

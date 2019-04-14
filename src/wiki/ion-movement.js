@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { electrolysisIonMovement } = require("../migration");
 const {
   expect,
@@ -20,7 +22,7 @@ const movement = electrolysisIonMovement({
   halfLife: Chlorine_HalfLife,
   volume: Cell_PrimaryCompartment,
   outflow: Cell_Outflow,
-  interface: Cell_InterfaceSize,
+  interfaceSize: Cell_InterfaceSize,
   current: Cell_InterfaceCurrent,
   startPH: pH_2100, endPH: pH_Target
 });

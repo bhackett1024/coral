@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { Units, Terms } = require("./units");
 
 // Compute the steady state amount of a substance N which exists due to a

@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { hydroxideRequirement } = require("../electrolysis");
 const { Units } = require("../units");
 const {

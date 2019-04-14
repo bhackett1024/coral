@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
 const { F, hydroxideRequirement, waterDisassociation } = require("./electrolysis");
 const { steadyStateAmount } = require("./chlorine");
@@ -301,13 +303,13 @@ for (const [name, concentration] of Object.entries(seawaterIons)) {
 // halfLife (s): Half-life of chlorine compounds.
 // volume (l): Size of the anode compartment.
 // outflow (l/s): Exchange between the anode compartment and environment.
-// interface (cm^2): Area of the interface between the compartments, across which
+// interfaceSize (cm^2): Area of the interface between the compartments, across which
 //   species can flow.
 // current (cm/s): Speed of convection in both compartments along the interface.
 // startPH (pH): Environmental pH.
 // endPH (pH): pH which the cathode compartment is being raised to.
 function electrolysisIonMovement({ T, S, DIC,
-                                   amps, halfLife, volume, outflow, interface, current,
+                                   amps, halfLife, volume, outflow, interfaceSize, current,
                                    startPH, endPH }) {
   // Here are the species that can have different concentrations in the two
   // compartments, and whose movements we need to account for:
@@ -410,7 +412,7 @@ function electrolysisIonMovement({ T, S, DIC,
 
   // The time taken for water to sweep past the interface. We assume the interface
   // region is square.
-  const refreshTime = interface.sqrt().div(current); // s
+  const refreshTime = interfaceSize.sqrt().div(current); // s
 
   // Compute the rate of diffusion across the interface, in mol/s.
   //
@@ -424,7 +426,7 @@ function electrolysisIonMovement({ T, S, DIC,
 
     // Change this to diffusion1 to compare implementations.
     const rate = diffusion2(concentrationDifference, coefficient, refreshTime); // mol/m^2
-    return rate.mul(interface).div(refreshTime); // mol/s
+    return rate.mul(interfaceSize).div(refreshTime); // mol/s
   }
 
   // Diffusing species we have to worry about:

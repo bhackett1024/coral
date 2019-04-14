@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { design1, design2, design3 } = require("../chlorine");
 const { Units } = require("../units");
 const {

@@ -1,5 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
+"use strict";
+
 const { generateBjerrumData } = require("../carbonate");
 const { Units, Terms } = require("../units");
 const { expect } = require("./utils");
