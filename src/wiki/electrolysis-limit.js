@@ -3,7 +3,7 @@
 "use strict";
 
 const { electrolysisLimit } = require("../electrolysis");
-const { Units, Terms } = require("../units");
+const { Units, Terms, round } = require("../units");
 const {
   expect,
   Temp_2100, Salinity_2100, DIC_2100, pH_2100,
@@ -17,4 +17,4 @@ const {
 expect(electrolysisLimit(Terms.Watts(100),
                          Temp_2100, Salinity_2100, DIC_2100, pH_2100,
                          pH_Target).normalize(Units.LitersPerSecond),
-       2.115018454758804);
+       2.113119894856589);

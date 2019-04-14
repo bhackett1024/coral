@@ -5,23 +5,11 @@
 const { assert } = require("./utils");
 const { Units, Terms } = require("./units");
 const { carbonateConcentrations, density } = require("./carbonate");
-
-// Universal gas constant.
-const R = Terms.JoulesPerKelvinMole(8.3145);
-
-// Faraday, the charge on a mole of electrons.
-const F = Terms.CoulombsPerMole(96485);
-
-// Compute the disassociation constant for H2O <-> H+ + OH-
-function waterDisassociation() {
-  // FIXME approximating here with the value for 25C. This also has a different
-  // value in seawater due to different ionic activities.
-  return Terms.MolesSquaredPerLiterSquared(1e-14);
-}
+const { waterDisassociation, Faraday, UniversalGasConstant, seawaterConcentration } = require("./constants");
 
 // Compute the disassociation constant for B(OH)3 + H2O <-> H+ + B(OH)4-
 function boricAcidDisassociation() {
-  // FIXMe approximating here with the value for 25C.
+  // FIXME approximating here with the value for 25C.
   // S. Zumdahl, S. Zumdahl, D. DeCoste
   // Chemistry, Tenth Edition (Cengage Learning, 2014), pp A24
   return Terms.Molarity(5.8e-10);
@@ -45,10 +33,7 @@ function electrolysisPotential(T, S, pH) {
   // E = E_SRP - RT/nF ln(Q)
   // units: (J/C) = (J/C) - (J/(K*mol)) * K / (C/mol)
 
-  // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
-  const ClStandard = Terms.MolesPerSeawaterKg(0.566);
-
-  const Cl = ClStandard.mul(S).div(Terms.Salinity(35));
+  const Cl = seawaterConcentration("Cl-", S);
 
   // pH is -log([H+]). [OH-] can be calculated from this using the dissociation
   // constant for water, Kw.
@@ -58,7 +43,7 @@ function electrolysisPotential(T, S, pH) {
   // Compute the actual potential using the Nernst equation.
   const E_SRP = Terms.Volts(-2.19);
   const logQ = OH.mul(OH).div(Cl.mul(Cl)).naturalLogarithm();
-  return E_SRP.sub(logQ.mul(R).mul(T).div(F.mul(Terms.Number(2))));
+  return E_SRP.sub(logQ.mul(UniversalGasConstant).mul(T).div(Faraday.mul(Terms.Number(2))));
 }
 
 // Compute the number of hydroxide ions (mol OH-) needed to raise the pH of a
@@ -105,11 +90,8 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // carbonate species.
   const Kb = boricAcidDisassociation();
 
-  // The total amount of boric acid species at S=35, in mol/kg-H2O
-  // F. Millero, Chemical Oceanography (CRC Press, 2013) pp 67
-  const totalBoricStandard = Terms.MolesPerSeawaterKg(0.0001045 + 0.0003259);
-
-  const totalBoric = totalBoricStandard.mul(S).div(Terms.Salinity(35));
+  // The total amount of boric acid species.
+  const totalBoric = seawaterConcentration("B(OH)3", S).add(seawaterConcentration("B(OH)4-", S));
 
   // As pH increases, [B(OH)4-] increases. Each such ion needs an OH- ion to
   // form from B(OH)3.
@@ -135,7 +117,7 @@ function electrolysisRequirement(T, S, DIC, V, startPH, endPH) {
 
   // Each amp will move one coulomb of electrons per second. Each electron will
   // reduce one H2O molecule to OH-.
-  return OH.mul(F);
+  return OH.mul(Faraday);
 }
 
 // Compute the theoretical limit for the amount of seawater that can have its pH
@@ -153,4 +135,4 @@ function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   return V.mul(amps).div(requirement);
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, waterDisassociation, F };
+module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement };

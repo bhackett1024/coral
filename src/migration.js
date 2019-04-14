@@ -3,9 +3,10 @@
 "use strict";
 
 const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
-const { F, hydroxideRequirement, waterDisassociation } = require("./electrolysis");
+const { hydroxideRequirement } = require("./electrolysis");
 const { steadyStateAmount } = require("./chlorine");
 const { Units, Terms } = require("./units");
+const { Species, SeawaterIons, waterDisassociation, Faraday } = require("./constants");
 
 function solveForParameter(start, end, fn) {
   for (var i = 0; i < 30; i++) {
@@ -213,51 +214,6 @@ function diffusion2(interfaceConcentration, coefficient, time) {
   return interfaceConcentration.mul(factor).mul(coefficient.mul(time).sqrt());
 }
 
-// For species of interest, track the following information:
-//
-// conductivity: limiting equivalent ionic conductivities (S cm^2/mol)
-// diffusion: diffusion coefficient (m^2/s)
-// charge: charge on the species
-//
-// Except where noted below, conductivity and diffusion coefficients are from:
-// http://www.aqion.de/site/194
-const gSpecies = {
-  "Na+": { conductivity: 50, diffusion: 1.33 * 1e-9, charge: 1 },
-  "Cl-": { conductivity: 76.2, diffusion: 2.03 * 1e-9, charge: -1 },
-  "Mg^{2+}": { conductivity: 53, diffusion: 0.705 * 1e-9, charge: 2 },
-  "Ca^{2+}": { conductivity: 59.6, diffusion: 0.793 * 1e-9, charge: 2 },
-  "K+": { conductivity: 73.6, diffusion: 1.96 * 1e-9, charge: 1 },
-  "SO4^{2-}": { conductivity: 80.4, diffusion: 1.07 * 1e-9, charge: -2 },
-  "OH-": { conductivity: 197.9, diffusion: 5.27 * 1e-9, charge: -1 },
-  "H+": { conductivity: 349.6, diffusion: 9.31 * 1e-9, charge: 1 },
-  "HCO3-": { conductivity: 44.3, diffusion: 1.18 * 1e-9, charge: -1 },
-  "CO3^{2-}": { conductivity: 71.7, diffusion: 0.955 * 1e-9, charge: -2 },
-
-  // The CO2 diffusion coefficient is from:
-  //
-  // Shane P. Cadogan, Geoffrey C. Maitland, J. P. Martin Trusler
-  // Diffusion Coefficients of CO2 and N2 in Water at Temperatures between
-  //   298.15 K and 423.15 K at Pressures up to 45 MPa
-  // J. Chem. Eng. Data 2014, 59, 519−525
-  //
-  // This is at a high pressure (14 MPa = 138 atm), which will affect things. Oh well.
-  "CO2": { diffusion: 2.233 * 1e-9 },
-
-  // Estimate the diffusion coefficient for OCl- using that of CL-.
-  "OCl-": { diffusion: 2.03 * 1e-9 }
-};
-for (const entry of Object.values(gSpecies)) {
-  if (entry.conductivity) {
-    entry.conductivity = Terms.SiemensSquareCentimersPerMole(entry.conductivity);
-  }
-  if (entry.diffusion) {
-    entry.diffusion = Terms.SquareMetersPerSecond(entry.diffusion);
-  }
-  if (entry.charge) {
-    entry.charge = Terms.Number(entry.charge);
-  }
-}
-
 // Compute the approximate contribution of an ion to the conductivity of a
 // solution, based on its molarity and limiting equivalent conductivity.
 // The constants for limiting conductivity are based on extrapolation to a
@@ -268,26 +224,16 @@ for (const entry of Object.values(gSpecies)) {
 // which account for this but these depend on additional constants determined
 // experimentally which are hard to find values for.
 function ionConductivity(name, concentration) {
-  const { conductivity, charge } = gSpecies[name];
+  // Ignore boric acid species (unknown conductivity, low concentration).
+  if (/B\(OH\)/.test(name)) {
+    return Terms.SiemensPerMeter(0);
+  }
+  const { conductivity, charge } = Species[name];
   return concentration.mul(conductivity).mul(charge.abs());
 }
 
-// Concentrations of the major ionic species in seawater (99.9% of ions,
-// S=35, T=25C), in mol/kg-H2O, are from:
-//
-// Frank J. Millero
-// Chemical Oceanography (CRC Press, 2013) page 67
-const seawaterIons = {
-  "Na+": Terms.MolesPerSeawaterKg(0.486),
-  "Cl-": Terms.MolesPerSeawaterKg(0.567),
-  "Mg^{2+}": Terms.MolesPerSeawaterKg(0.055),
-  "Ca^{2+}": Terms.MolesPerSeawaterKg(0.011),
-  "K+": Terms.MolesPerSeawaterKg(0.011),
-  "SO4^{2-}": Terms.MolesPerSeawaterKg(0.029)
-};
-
 let seawaterConductivity = Terms.SiemensPerMeter(0);
-for (const [name, concentration] of Object.entries(seawaterIons)) {
+for (const [name, concentration] of Object.entries(SeawaterIons)) {
   seawaterConductivity = seawaterConductivity.add(ionConductivity(name, concentration));
 }
 // > console.log(seawaterConductivity.normalize(SiemensPerMeter));
@@ -319,7 +265,7 @@ function electrolysisIonMovement({ T, S, DIC,
   // Cl2/HOCl/OCl-
 
   // How much charge moves between compartments.
-  const chargeRate = amps.div(F); // mol/s
+  const chargeRate = amps.div(Faraday); // mol/s
 
   // Compute the steady state pH of the anode compartment: enough H+ is produced
   // each second to lower the inflow of water (equal to the outflow) from the
@@ -354,7 +300,7 @@ function electrolysisIonMovement({ T, S, DIC,
     //
     // Allen J. Bard, Larry R. Faulkner
     // Electrochemical methods: fundamentals and applications, 2nd ed. (John Wiley & Sons Inc, 2001), page 67
-    const { charge } = gSpecies[name];
+    const { charge } = Species[name];
     const transport = ionConductivity(name, concentration).div(seawaterConductivity);
     return transport.mul(chargeRate).div(charge.abs());
   }
@@ -422,7 +368,7 @@ function electrolysisIonMovement({ T, S, DIC,
     if (concentrationDifference.isNegative()) {
       return Terms.MolesPerSecond(0);
     }
-    const { diffusion: coefficient } = gSpecies[name];
+    const { diffusion: coefficient } = Species[name];
 
     // Change this to diffusion1 to compare implementations.
     const rate = diffusion2(concentrationDifference, coefficient, refreshTime); // mol/m^2
