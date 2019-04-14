@@ -224,7 +224,15 @@ const Derived2 = {
       { unit: Derived.Amperes },
       { unit: Base.Volts }
     ]
-  }
+  },
+
+  AmpSeconds: {
+    name: "A s",
+    components: [
+      { unit: Derived.Amperes },
+      { unit: Base.Seconds }
+    ]
+  },
 };
 
 const Units = {

@@ -140,6 +140,16 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   return Terms.Molarity(newOH);
 }
 
+// Return how many amp-seconds are required to raise a volume V from startPH to endPH.
+function electrolysisRequirement(T, S, DIC, V, startPH, endPH) {
+  const requirement = hydroxideRequirement(T, S, DIC, startPH, endPH).normalize(Units.Molarity);
+  const OH = requirement * V.normalize(Units.Liters);
+
+  // Each amp will move one coulomb of electrons per second. Each electron will
+  // reduce one H2O molecule to OH-.
+  return Terms.AmpSeconds(OH * F);
+}
+
 // Compute the theoretical limit for the amount of seawater that can have its pH
 // raised from startPH to endPH using electrolysis, using a power source W.
 function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
@@ -148,15 +158,10 @@ function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   // The actual voltage depends on the environment and will need to be
   // determined experimentally.
   const potential = -electrolysisPotential(T, S, startPH).normalize(Units.Volts);
-  const Amps = W.normalize(Units.Watts) / potential;
+  const amps = W.normalize(Units.Watts) / potential;
 
-  // Each amp will move one coulomb of electrons per second. Each electron will
-  // reduce one H2O molecule to OH-.
-  const OH = Amps * C;
-
-  const requirement = hydroxideRequirement(T, S, DIC, startPH, endPH).normalize(Units.Molarity);
-
-  return Terms.LitersPerSecond(OH / Avogadro / requirement);
+  const requirement = electrolysisRequirement(T, S, DIC, Terms.Liters(1), startPH, endPH);
+  return Terms.LitersPerSecond(amps / requirement.normalize(Units.AmpSeconds));
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, hydroxideRequirement, C, Avogadro };
+module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, C, Avogadro };
