@@ -9,6 +9,7 @@ const { assert } = require("./utils");
 // units used in a calculation match up with each other.
 
 function Term(value, unit) {
+  assert(typeof value == "number" && !Number.isNaN(value), "Bad value");
   if (unit instanceof Array) {
     // Internal constructor which supplies the primitive components directly.
     this.value = value;
@@ -61,15 +62,28 @@ Term.prototype = {
   },
 
   sub(v) {
+    return this.add(v.negate());
+  },
+
+  negate(v) {
+    return new Term(-this.value, this.components);
+  },
+
+  lessThan(v) {
     assert(v instanceof Term);
     assert(componentsMatch(this.components, v.components),
-           `Components must match for sub: ${JSON.stringify(this.components)} ${JSON.stringify(v.components)}`);
-    return new Term(this.value - v.value, this.components);
+           `Components must match for lessThan: ${JSON.stringify(this.components)} ${JSON.stringify(v.components)}`);
+    return this.value < v.value;
   },
 
   // Convert a dimensionless quantity to its number.
   number() {
     return this.normalize(Units.Number);
+  },
+
+  // Get the natural logarithm of a dimensionless quantity.
+  naturalLogarithm() {
+    return Terms.Number(Math.log(this.number()));
   },
 
   // Get the concentration of H+ for a given pH.
@@ -186,8 +200,8 @@ const Base = {
     name: "C"
   },
 
-  Volts: {
-    name: "V"
+  Joules: {
+    name: "J"
   }
 };
 
@@ -250,6 +264,31 @@ const Derived1 = {
       { unit: Base.Seconds, power: -1 }
     ]
   },
+
+  Volts: {
+    name: "V",
+    components: [
+      { unit: Base.Joules },
+      { unit: Base.Coulombs, power: -1 }
+    ]
+  },
+
+  JoulesPerKelvinMole: {
+    name: "J K^-1 mol^-1",
+    components: [
+      { unit: Base.Joules },
+      { unit: Base.Kelvin, power: -1 },
+      { unit: Base.Moles, power: -1 }
+    ]
+  },
+
+  CoulombsPerMole: {
+    name: "C/mol",
+    components: [
+      { unit: Base.Coulombs },
+      { unit: Base.Moles, power: -1 }
+    ]
+  },
 };
 
 const Derived2 = {
@@ -284,7 +323,7 @@ const Derived2 = {
     name: "W",
     components: [
       { unit: Derived1.Amperes },
-      { unit: Base.Volts }
+      { unit: Derived1.Volts }
     ]
   },
 

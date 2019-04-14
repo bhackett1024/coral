@@ -5,16 +5,10 @@ const { Units, Terms } = require("./units");
 const { carbonateConcentrations, density } = require("./carbonate");
 
 // Universal gas constant.
-const R = 8.3145; // J/(K*mol)
+const R = Terms.JoulesPerKelvinMole(8.3145);
 
 // Faraday, the charge on a mole of electrons.
-const F = 96485; // C/mol
-
-// Avogadro's number, the number of things in a mole.
-const Avogadro = 6.022e23;
-
-// The number of electrons transferred by a coulomb (1 ampere-second).
-const C = Avogadro / F;
+const F = Terms.CoulombsPerMole(96485);
 
 // Compute the disassociation constant for H2O <-> H+ + OH-
 function waterDisassociation() {
@@ -60,8 +54,9 @@ function electrolysisPotential(T, S, pH) {
   const OH = Kw.div(pH.concentrationH());
 
   // Compute the actual potential using the Nernst equation.
-  const Q = Math.pow(OH.normalize(Units.Molarity), 2) / Math.pow(Cl.normalize(Units.Molarity), 2);
-  return Terms.Volts(-2.19 - R * T.normalize(Units.Kelvin) / (2 * F) * Math.log(Q));
+  const E_SRP = Terms.Volts(-2.19);
+  const logQ = OH.mul(OH).div(Cl.mul(Cl)).naturalLogarithm();
+  return E_SRP.sub(logQ.mul(R).mul(T).div(F.mul(Terms.Number(2))));
 }
 
 // Compute the number of hydroxide ions (mol OH-) needed to raise the pH of a
@@ -76,7 +71,7 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // neutralized by an introduced OH- ion.
   const startH = startPH.concentrationH();
   const endH = endPH.concentrationH();
-  assert(endH.normalize(Units.Molarity) < startH.normalize(Units.Molarity));
+  assert(endH.lessThan(startH));
   newOH = newOH.add(startH.sub(endH));
 
   // [OH-] increases as pH increases. As H+ ions are removed, additional OH-
@@ -85,7 +80,7 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   const Kw = waterDisassociation();
   const startOH = Kw.div(startH);
   const endOH = Kw.div(endH);
-  assert(endOH.normalize(Units.Molarity) > startOH.normalize(Units.Molarity));
+  assert(startOH.lessThan(endOH));
   newOH = newOH.add(endOH.sub(startOH));
 
   // As pH increases, the concentrations of CO2 and HCO3 will decrease, adding
@@ -125,7 +120,7 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
   // [B(OH)4-] = Kb[TotalBoric] / ([H+] + Kb)
   const startBorate = Kb.mul(totalBoric).div(startH.add(Kb));
   const endBorate = Kb.mul(totalBoric).div(endH.add(Kb));
-  assert(startBorate.normalize(Units.Molarity) < endBorate.normalize(Units.Molarity));
+  assert(startBorate.lessThan(endBorate));
   newOH = newOH.add(endBorate.sub(startBorate));
 
   return newOH;
@@ -133,12 +128,12 @@ function hydroxideRequirement(T, S, DIC, startPH, endPH) {
 
 // Return how many amp-seconds are required to raise a volume V from startPH to endPH.
 function electrolysisRequirement(T, S, DIC, V, startPH, endPH) {
-  const requirement = hydroxideRequirement(T, S, DIC, startPH, endPH).normalize(Units.Molarity);
-  const OH = requirement * V.normalize(Units.Liters);
+  const requirement = hydroxideRequirement(T, S, DIC, startPH, endPH);
+  const OH = requirement.mul(V);
 
   // Each amp will move one coulomb of electrons per second. Each electron will
   // reduce one H2O molecule to OH-.
-  return Terms.AmpSeconds(OH * F);
+  return OH.mul(F);
 }
 
 // Compute the theoretical limit for the amount of seawater that can have its pH
@@ -148,11 +143,12 @@ function electrolysisLimit(W, T, S, DIC, startPH, endPH) {
   // required will be greater than that produced by electrolysisPotential().
   // The actual voltage depends on the environment and will need to be
   // determined experimentally.
-  const potential = -electrolysisPotential(T, S, startPH).normalize(Units.Volts);
-  const amps = W.normalize(Units.Watts) / potential;
+  const potential = electrolysisPotential(T, S, startPH).negate();
+  const amps = W.div(potential);
 
-  const requirement = electrolysisRequirement(T, S, DIC, Terms.Liters(1), startPH, endPH);
-  return Terms.LitersPerSecond(amps / requirement.normalize(Units.AmpSeconds));
+  const V = Terms.Liters(1);
+  const requirement = electrolysisRequirement(T, S, DIC, V, startPH, endPH);
+  return V.mul(amps).div(requirement);
 }
 
-module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, C, Avogadro };
+module.exports = { electrolysisLimit, electrolysisPotential, electrolysisRequirement, hydroxideRequirement, F };

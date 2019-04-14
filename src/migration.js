@@ -1,7 +1,7 @@
 /* Copyright 2019 Brian Hackett. Released under the MIT license. */
 
 const { carbonateConcentrations, density, densityH2O } = require("./carbonate");
-const { C, Avogadro, hydroxideRequirement } = require("./electrolysis");
+const { F, hydroxideRequirement } = require("./electrolysis");
 const { steadyStateAmount } = require("./chlorine");
 const { Units, Terms } = require("./units");
 
@@ -310,7 +310,7 @@ function electrolysisIonMovement({ T, S, DIC,
   // Cl2/HOCl/OCl-
 
   // How much charge moves between compartments.
-  const chargeRate = amps * C / Avogadro; // mol/s
+  const chargeRate = amps / F.normalize(Units.CoulombsPerMole); // mol/s
 
   // Compute the steady state pH of the anode compartment: enough H+ is produced
   // each second to lower the inflow of water (equal to the outflow) from the

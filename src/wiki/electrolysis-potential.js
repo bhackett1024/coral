@@ -8,4 +8,4 @@ const { expect, Temp_2100, Salinity_2100, DIC_2100, pH_2100 } = require("./utils
 //
 // Calculate the theoretical potential needed for seawater electrolysis.
 expect(electrolysisPotential(Temp_2100, Salinity_2100, pH_2100).normalize(Units.Volts),
-       -1.8291746852860526);
+       -1.8291746852860524);

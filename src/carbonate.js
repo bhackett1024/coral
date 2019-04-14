@@ -55,10 +55,10 @@ function generateBjerrumData(T, S, startPH, endPH, numPoints) {
     concentrations.push(carbonateConcentrations(T, S, Terms.Molarity(1), pH));
   }
   return {
-    pH: pHs.map(v => v.normalize(Units.pH)),
-    CO2: concentrations.map(v => v.CO2.normalize(Units.Molarity)),
-    HCO3: concentrations.map(v => v.HCO3.normalize(Units.Molarity)),
-    CO3: concentrations.map(v => v.CO3.normalize(Units.Molarity))
+    pH: pHs,
+    CO2: concentrations.map(v => v.CO2),
+    HCO3: concentrations.map(v => v.HCO3),
+    CO3: concentrations.map(v => v.CO3)
   };
 }
 
