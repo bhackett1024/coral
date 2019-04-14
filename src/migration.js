@@ -452,13 +452,13 @@ function electrolysisIonMovement({ T, S, DIC,
   // For every two electrons conducted, at most one molecule of Cl2 will be
   // produced. The rate of active chlorine atom generation is then at most the
   // rate of conducted electrons.
-  const anodeCl = steadyStateAmount(chargeRate, halfLife) / volume;
+  const anodeCl = steadyStateAmount(Terms.MolesPerSecond(chargeRate), Terms.Seconds(halfLife)).normalize(Units.Moles) / volume;
   const diffusionCl = diffusion("OCl-", anodeCl); // mol/s
 
   // The diffusion of chlorine into the cathode compartment is a point source.
   // Compute how much seawater is needed to dilute this chlorine to PNEC concentration.
   const chlorineWeight = diffusionCl / 35.45; // g/s
-  const chlorineRelease = Terms.Grams(steadyStateAmount(chlorineWeight, halfLife));
+  const chlorineRelease = steadyStateAmount(Terms.GramsPerSecond(chlorineWeight), Terms.Seconds(halfLife));
 
   return { migrationLoss, diffusionLoss, chlorineRelease };
 }

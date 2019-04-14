@@ -60,6 +60,11 @@ Term.prototype = {
     return new Term(this.value + v.value, this.components);
   },
 
+  // Convert a dimensionless quantity to its number.
+  number() {
+    return this.normalize(Units.Number);
+  },
+
   // Get the concentration of H+ for a given pH.
   concentrationH() {
     assert(this.components.length == 1 &&
@@ -213,6 +218,14 @@ const Derived1 = {
     name: "m/s",
     components: [
       { unit: Base.Meters },
+      { unit: Base.Seconds, power: -1 }
+    ]
+  },
+
+  MolesPerSecond: {
+    name: "mol/s",
+    components: [
+      { unit: Base.Moles },
       { unit: Base.Seconds, power: -1 }
     ]
   },

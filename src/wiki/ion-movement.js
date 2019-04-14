@@ -26,4 +26,4 @@ const movement = electrolysisIonMovement({
 });
 expect(movement.migrationLoss + movement.diffusionLoss, 0.004339472992548044);
 expect(movement.chlorineRelease.normalize(Units.Grams) /
-       Chlorine_PNEC.normalize(Units.GramsPerLiter), 94.47230599266902);
+       Chlorine_PNEC.normalize(Units.GramsPerLiter), 94.47230599266899);

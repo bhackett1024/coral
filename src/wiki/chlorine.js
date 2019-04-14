@@ -18,22 +18,22 @@ const Chlorine2 = design2(Cell_ChlorineRate, Chlorine_HalfLife,
 const Chlorine3 = design3(Cell_ChlorineRate, Chlorine_HalfLife,
                           Cell_PrimaryCompartment, Cell_Outflow,
                           Cell_SecondaryCompartment).normalize(Units.Grams);
-expect(Chlorine1, 63.363166195843284);
-expect(Chlorine2, 4.875398701107538);
+expect(Chlorine1, 63.36316619584327);
+expect(Chlorine2, 4.875398701107535);
 expect(Chlorine3, 0.06405789516709288);
 
 // Compare the amounts of chlorine produced by the designs:
-expect(Chlorine2 / Chlorine1, 0.07694373551407807);
-expect(Chlorine3 / Chlorine2, 0.013139006488339289);
-expect(Chlorine3 / Chlorine1, 0.001010964240156534);
+expect(Chlorine2 / Chlorine1, 0.07694373551407804);
+expect(Chlorine3 / Chlorine2, 0.013139006488339296);
+expect(Chlorine3 / Chlorine1, 0.0010109642401565342);
 
 function chlorineToBleach(Cl) {
   return Cl / 0.48 / 0.0525;
 }
 
 // Compute the approximate amount of bleach (ml) with an equivalent amount of chlorine.
-expect(chlorineToBleach(Chlorine1), 2514.4113569779083);
-expect(chlorineToBleach(Chlorine2), 193.4682024249023);
+expect(chlorineToBleach(Chlorine1), 2514.411356977908);
+expect(chlorineToBleach(Chlorine2), 193.46820242490222);
 expect(chlorineToBleach(Chlorine3), 2.541979966948131);
 
 // Compute the volume needed to dilute 0.064 g of chlorine to the PNEC concentration.
